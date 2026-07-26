@@ -1,4 +1,4 @@
-export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun }){
+export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound }){
   const hud = document.getElementById('hud');
   const head = document.getElementById('head');
   head.addEventListener('click', function(){
@@ -19,6 +19,12 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun }){
     const on = bSun.getAttribute('aria-pressed') !== 'true';
     bSun.setAttribute('aria-pressed', String(on));
     onToggleSun(on);
+  });
+  const bSound = document.getElementById('btn-sound');
+  bSound.addEventListener('click', function(){
+    const on = bSound.getAttribute('aria-pressed') !== 'true';
+    bSound.setAttribute('aria-pressed', String(on));
+    onToggleSound(on);
   });
 
   const elN = document.getElementById('n');

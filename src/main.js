@@ -6,6 +6,7 @@ import { createScatterSystem } from './world/scatter.js';
 import { createVolcanoSystem } from './world/volcano.js';
 import { createDinoSystem } from './world/dinos.js';
 import { createNestSystem } from './world/nests.js';
+import { createAudioSystem } from './audio/audio.js';
 import { createTerrainMaterial } from './render/terrainMaterial.js';
 import { createWaterMaterial } from './render/waterMaterial.js';
 import { createCameraControls } from './input/camera.js';
@@ -75,14 +76,21 @@ const scatter = createScatterSystem(scene);
 const volcano = createVolcanoSystem(scene, lavaLight);
 const mesh = createMeshSystem(scene, terrainMaterial.material, scatter, volcano);
 const nests = createNestSystem(scene);
+const audio = createAudioSystem();
 
 const hud = createHud({
-  onNewIsland: function(){ newIsland(); nests.clear(); rebuild(); },
-  onClear: function(){ clearAll(); nests.clear(); rebuild(); },
-  onToggleVeg: function(on){ showVeg = on; rebuild(); },
+  onNewIsland: function(){ audio.unlock(); audio.playClick(); newIsland(); nests.clear(); rebuild(); },
+  onClear: function(){ audio.unlock(); audio.playClick(); clearAll(); nests.clear(); rebuild(); },
+  onToggleVeg: function(on){ audio.unlock(); audio.playClick(); showVeg = on; rebuild(); },
   onToggleSun: function(on){
+    audio.unlock(); audio.playClick();
     renderer.shadowMap.enabled = on;
     scene.traverse(function(o){ if (o.material) o.material.needsUpdate = true; });
+  },
+  onToggleSound: function(on){
+    audio.unlock();
+    audio.setMuted(!on);
+    audio.playClick(); // só toca se "on" for true — playClick já respeita o mudo
   }
 });
 
@@ -91,6 +99,7 @@ function rebuild(){
   const stats = mesh.rebuild(showVeg);
   hud.setStats(stats);
   dinos.onTerrainChanged();
+  audio.setVolcanoRumble(stats.volcanoCount > 0);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -134,7 +143,16 @@ function edit(px, py, d){
   if (h === c.h) return;
   const dug = h < c.h;
   c.h = h;
-  if (dug && !c.fossil && Math.random() < FOSSIL_CHANCE) c.fossil = true;
+  audio.unlock();
+  if (dug){
+    audio.playDig();
+    if (!c.fossil && Math.random() < FOSSIL_CHANCE){
+      c.fossil = true;
+      audio.playFossil();
+    }
+  } else {
+    audio.playRaise();
+  }
   rebuild();
   showRing(c);
 }
