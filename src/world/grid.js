@@ -7,6 +7,7 @@ export const STEP   = 0.5;
 export const MAXH   = 9;
 export const GRID_R = 9;
 export const BOTTOM = -0.7;
+export const WATER_Y = 0.03;
 export const JITTER = 0.26;
 export const TESS   = 3;     // subdivisões por triângulo grosseiro
 export const ROUND  = 0.85;  // 0 = facetado, 1 = curvatura PN cheia
@@ -56,7 +57,7 @@ for (let q = -GRID_R; q <= GRID_R; q++){
   for (let r = r1; r <= r2; r++){
     cells.set(kcell(q,r), {
       q:q, r:r, h:0, seed:(q+512)*7919 + (r+512)*104729,
-      cor:null, mid:null, volcano:false, scorch:0
+      cor:null, mid:null, volcano:false, scorch:0, fossil:false
     });
   }
 }
@@ -85,6 +86,21 @@ export function newIsland(){
     const n1 = hash(c.q + s, c.r - s);
     const n2 = hash(c.q*3 + 7 + s, c.r*3 - 5 - s);
     c.h = Math.max(0, Math.min(MAXH, Math.round(4.4 - d*0.55 + (n1-0.5)*2.7 + (n2-0.5)*1.6)));
+    c.fossil = false; // ilha nova, fósseis pra descobrir de novo
   });
 }
-export function clearAll(){ cells.forEach(function(c){ c.h = 0; }); }
+export function clearAll(){ cells.forEach(function(c){ c.h = 0; c.fossil = false; }); }
+
+export function cellAt(x, z){
+  const qr = worldToHex(x, z);
+  return cells.get(kcell(qr[0], qr[1])) || null;
+}
+
+// Altura aproximada do terreno em (x,z): usa o topo já calculado da célula
+// hexagonal mais próxima (c.mid é preenchido por world/mesh.js a cada
+// rebuild()). Não tem a precisão dos retalhos PN da malha visual, mas é
+// suficiente pra apoiar os pés dos dinos.
+export function heightAt(x, z){
+  const c = cellAt(x, z);
+  return (c && c.mid) ? c.mid.topY : WATER_Y;
+}

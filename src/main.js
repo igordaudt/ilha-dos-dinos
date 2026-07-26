@@ -1,10 +1,12 @@
 import './style.css';
 import * as THREE from 'three';
-import { cells, kcell, GRID_R, SQ3, SIZE, MAXH, BOTTOM, worldToHex, newIsland, clearAll } from './world/grid.js';
+import { cells, kcell, GRID_R, SQ3, SIZE, MAXH, BOTTOM, WATER_Y, worldToHex, newIsland, clearAll } from './world/grid.js';
 import { createMeshSystem } from './world/mesh.js';
 import { createScatterSystem } from './world/scatter.js';
 import { createVolcanoSystem } from './world/volcano.js';
+import { createDinoSystem } from './world/dinos.js';
 import { createTerrainMaterial } from './render/terrainMaterial.js';
+import { createWaterMaterial } from './render/waterMaterial.js';
 import { createCameraControls } from './input/camera.js';
 import { createHud } from './ui/hud.js';
 
@@ -16,6 +18,7 @@ const renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias:true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; // contraste mais "cinematográfico", sem mexer nas cores dos materiais
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xdbe8f1);
@@ -40,12 +43,11 @@ const lavaLight = new THREE.PointLight(0xff7a2a, 0, 11, 2);
 scene.add(lavaLight);
 
 const SPAN = (GRID_R + 4) * SQ3 * SIZE * 2;
+const BUILD_RADIUS = GRID_R * SQ3 * SIZE; // até onde dá pra ter terreno; daí em diante é alto-mar
 const waterGeo = new THREE.PlaneGeometry(SPAN, SPAN, 44, 44);
-const water = new THREE.Mesh(waterGeo, new THREE.MeshPhongMaterial({
-  color:0x74b1dc, transparent:true, opacity:0.80, shininess:70, specular:0xa8d6f0
-}));
+const water = new THREE.Mesh(waterGeo, createWaterMaterial(BUILD_RADIUS, SPAN/2));
 water.rotation.x = -Math.PI/2;
-water.position.y = 0.03;
+water.position.y = WATER_Y;
 water.receiveShadow = true;
 scene.add(water);
 const waterBase = waterGeo.attributes.position.array.slice();
@@ -86,6 +88,7 @@ let showVeg = true;
 function rebuild(){
   const stats = mesh.rebuild(showVeg);
   hud.setStats(stats);
+  dinos.onTerrainChanged();
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -121,12 +124,15 @@ function showRing(c){
   ring.visible = true;
 }
 function hover(px, py){ showRing(pick(px, py)); }
+const FOSSIL_CHANCE = 0.12; // chance de achar um fóssil ao cavar, só pra ser divertido
 function edit(px, py, d){
   const c = pick(px, py);
   if (!c) return;
   const h = Math.max(0, Math.min(MAXH, c.h + d));
   if (h === c.h) return;
+  const dug = h < c.h;
   c.h = h;
+  if (dug && !c.fossil && Math.random() < FOSSIL_CHANCE) c.fossil = true;
   rebuild();
   showRing(c);
 }
@@ -151,8 +157,11 @@ function resize(){
 window.addEventListener('resize', resize);
 
 const wpos = waterGeo.attributes.position;
+let lastMs = null;
 function animate(ms){
   const t = ms*0.001;
+  const dt = lastMs === null ? 0 : (ms - lastMs)*0.001;
+  lastMs = ms;
   for (let i = 0; i < wpos.count; i++){
     const x = waterBase[i*3], y = waterBase[i*3+1];
     wpos.array[i*3+2] = Math.sin(x*0.35 + t*0.9)*0.055 + Math.cos(y*0.42 - t*1.2)*0.045;
@@ -160,11 +169,13 @@ function animate(ms){
   wpos.needsUpdate = true;
   terrainMaterial.setTime(t);
   volcano.update(t);
+  dinos.update(dt, t);
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
 
 newIsland();
+const dinos = createDinoSystem(scene, scatter, renderer);
 rebuild();
 resize();
 applyCamera();

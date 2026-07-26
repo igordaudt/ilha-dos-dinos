@@ -19,8 +19,8 @@ export function createCameraControls({ canvas, camera, gridR, sq3, size, onTap, 
     const k = cam.dist * 0.0016;
     const right   = new THREE.Vector3(-Math.sin(cam.theta), 0,  Math.cos(cam.theta));
     const forward = new THREE.Vector3(-Math.cos(cam.theta), 0, -Math.sin(cam.theta));
-    cam.target.addScaledVector(right, -dx*k);
-    cam.target.addScaledVector(forward, -dy*k);
+    cam.target.addScaledVector(right, dx*k);
+    cam.target.addScaledVector(forward, dy*k);
     const lim = gridR * sq3 * size;
     cam.target.x = Math.max(-lim, Math.min(lim, cam.target.x));
     cam.target.z = Math.max(-lim, Math.min(lim, cam.target.z));
@@ -50,7 +50,7 @@ export function createCameraControls({ canvas, camera, gridR, sq3, size, onTap, 
       if (pinchDist > 0) cam.dist *= pinchDist / Math.max(d, 1);
       panBy(m.x - pinchMid.x, m.y - pinchMid.y);
       pinchDist = d; pinchMid = m;
-    } else if (mode === 'orbit'){ cam.theta -= dx*0.006; cam.phi -= dy*0.006; }
+    } else if (mode === 'orbit'){ cam.theta += dx*0.006; cam.phi -= dy*0.006; }
     else if (mode === 'pan'){ panBy(dx, dy); }
     applyCamera();
   });

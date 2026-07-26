@@ -244,6 +244,11 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
                 mid[1] + (C[i].p[1]-mid[1])*t,
                 mid[2] + (C[i].p[2]-mid[2])*t + (jx ? (R()-0.5)*jx : 0)];
       }
+      if (c.fossil){
+        const p = spot(Math.floor(R()*6), 0.15 + R()*0.5, 0.10);
+        const s = 0.75 + R()*0.5;
+        scatter.add('fossil', p[0], p[1] - 0.02, p[2], s, s, s, R()*6.28, 0);
+      }
       if (c.volcano || c.scorch > 0.3){
         for (let j = 0; j < 3; j++){
           if (R() > 0.5) continue;

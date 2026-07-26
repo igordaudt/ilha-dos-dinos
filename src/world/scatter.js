@@ -110,6 +110,26 @@ function logGeo(){
   t.rotateZ(Math.PI/2); t.translate(0, 0.05, 0);
   return bake([{ geo:t, col:[0.36,0.29,0.22], jit:0.20 }]);
 }
+// fóssil: achado raro ao cavar — costelas meio enterradas e um crânio,
+// num tom osso que não se confunde com pedra nem com madeira
+function fossilGeo(){
+  const parts = [];
+  const rib1 = new THREE.TorusGeometry(0.16, 0.018, 5, 8, Math.PI*0.85);
+  rib1.rotateX(Math.PI/2); rib1.translate(0, 0.02, 0.02);
+  parts.push({ geo:rib1, col:[0.86,0.82,0.72], jit:0.12 });
+  const rib2 = new THREE.TorusGeometry(0.12, 0.015, 5, 7, Math.PI*0.8);
+  rib2.rotateX(Math.PI/2); rib2.translate(0.10, 0.015, -0.05);
+  parts.push({ geo:rib2, col:[0.84,0.80,0.70], jit:0.12 });
+  const skull = new THREE.IcosahedronGeometry(0.09, 0);
+  skull.scale(1.3, 0.7, 1.0);
+  skull.translate(-0.16, 0.03, 0.04);
+  parts.push({ geo:skull, col:[0.88,0.85,0.76], jit:0.10 });
+  const shard = new THREE.CylinderGeometry(0.015, 0.02, 0.22, 5);
+  shard.rotateZ(Math.PI*0.45);
+  shard.translate(0.02, 0.02, -0.14);
+  parts.push({ geo:shard, col:[0.82,0.78,0.68], jit:0.14 });
+  return bake(parts);
+}
 
 const decoMat = new THREE.MeshPhongMaterial({
   vertexColors:true, flatShading:true, shininess:2, specular:0x0a0a0a
@@ -136,10 +156,14 @@ export function createScatterSystem(scene){
     log    : makeIM(logGeo(),      220, true),
     tuft   : makeIM(tuftGeo(),    2600, false),
     flowerA: makeIM(flowerGeo([0.94,0.80,0.34]), 450, false),
-    flowerB: makeIM(flowerGeo([0.88,0.55,0.68]), 350, false)
+    flowerB: makeIM(flowerGeo([0.88,0.55,0.68]), 350, false),
+    fossil : makeIM(fossilGeo(), 60, false)
   };
   const DKEYS = Object.keys(D);
   const N = {};
+  // posições atuais de cada tipo — os dinos usam pra procurar comida
+  // (araucária, arbusto...); refeitas a cada rebuild(), nunca ficam velhas.
+  const positions = {};
 
   const _M = new THREE.Matrix4(), _Q = new THREE.Quaternion();
   const _E = new THREE.Euler(), _V = new THREE.Vector3(), _S = new THREE.Vector3();
@@ -152,9 +176,13 @@ export function createScatterSystem(scene){
     _M.compose(_V, _Q, _S);
     im.setMatrixAt(i, _M);
     N[k] = i + 1;
+    positions[k].push({ x:x, y:y, z:z });
   }
   function beginBuild(){
-    for (let i = 0; i < DKEYS.length; i++) N[DKEYS[i]] = 0;
+    for (let i = 0; i < DKEYS.length; i++){
+      N[DKEYS[i]] = 0;
+      positions[DKEYS[i]] = [];
+    }
   }
   function endBuild(){
     for (let i = 0; i < DKEYS.length; i++){
@@ -163,6 +191,7 @@ export function createScatterSystem(scene){
       D[k].instanceMatrix.needsUpdate = true;
     }
   }
+  function getPositions(k){ return positions[k] || []; }
 
-  return { add, beginBuild, endBuild };
+  return { add, beginBuild, endBuild, getPositions };
 }
