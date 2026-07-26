@@ -1,13 +1,39 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ilha-dos-dinos</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<title>Ilha dos Dinos — M0</title>
+</head>
+<body>
+
+<div id="boot">preparando a ilha…</div>
+
+<div id="hud">
+  <button id="head" aria-expanded="false"><span>Ilha dos Dinos</span><span class="chev">▼</span></button>
+  <div id="panel">
+    <dl>
+      <dt>Clique</dt><dd>levanta a terra</dd>
+      <dt>Shift + clique / botão direito</dt><dd>afunda — no zero vira mar</dd>
+      <dt>Arrastar / rolar</dt><dd>gira a câmera / aproxima</dd>
+    </dl>
+    <p class="tip">Sete hexágonos no nível máximo, um no centro e seis em volta, acendem um vulcão.</p>
+    <div class="row">
+      <button class="act" id="btn-new">Nova ilha</button>
+      <button class="act" id="btn-clear">Só mar</button>
+    </div>
+    <div class="row">
+      <button class="act" id="btn-veg" aria-pressed="true">Vegetação</button>
+      <button class="act" id="btn-sun" aria-pressed="true">Sombras</button>
+    </div>
+  </div>
+</div>
+
+<div id="stat">terra: <span id="n">0</span> · pico: <span id="p">0</span><span id="vc"></span></div>
+
+<canvas id="c"></canvas>
+
+<script type="module" src="/src/main.js"></script>
+</body>
 </html>

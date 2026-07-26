@@ -1,60 +1,172 @@
-import './style.css'
-import javascriptLogo from './assets/javascript.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import { setupCounter } from './counter.js'
+import './style.css';
+import * as THREE from 'three';
+import { cells, kcell, GRID_R, SQ3, SIZE, MAXH, BOTTOM, worldToHex, newIsland, clearAll } from './world/grid.js';
+import { createMeshSystem } from './world/mesh.js';
+import { createScatterSystem } from './world/scatter.js';
+import { createVolcanoSystem } from './world/volcano.js';
+import { createTerrainMaterial } from './render/terrainMaterial.js';
+import { createCameraControls } from './input/camera.js';
+import { createHud } from './ui/hud.js';
 
-document.querySelector('#app').innerHTML = `
-<section id="center">
-  <div class="hero">
-    <img src="${heroImg}" class="base" width="170" height="179">
-    <img src="${javascriptLogo}" class="framework" alt="JavaScript logo"/>
-    <img src="${viteLogo}" class="vite" alt="Vite logo" />
-  </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/main.js</code> and save to test <code>HMR</code></p>
-  </div>
-  <button id="counter" type="button" class="counter"></button>
-</section>
+/* ═══════════════════════════════════════════════════════
+   Cena
+   ═══════════════════════════════════════════════════════ */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-<div class="ticks"></div>
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xdbe8f1);
+scene.fog = new THREE.Fog(0xdbe8f1, 30, 78);
 
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#documentation-icon"></use></svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank">
-          <img class="logo" src="${viteLogo}" alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank">
-          <img class="button-icon" src="${javascriptLogo}" alt="">
-          Learn more
-        </a>
-      </li>
-    </ul>
-  </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#social-icon"></use></svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li><a href="https://github.com/vitejs/vite" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#github-icon"></use></svg>GitHub</a></li>
-      <li><a href="https://chat.vite.dev/" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#discord-icon"></use></svg>Discord</a></li>
-      <li><a href="https://x.com/vite_js" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#x-icon"></use></svg>X.com</a></li>
-      <li><a href="https://bsky.app/profile/vite.dev" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#bluesky-icon"></use></svg>Bluesky</a></li>
-    </ul>
-  </div>
-</section>
+const camera = new THREE.PerspectiveCamera(38, 1, 0.5, 220);
 
-<div class="ticks"></div>
-<section id="spacer"></section>
-`
+scene.add(new THREE.HemisphereLight(0xdff0ff, 0x8f8468, 0.66));
+const sun = new THREE.DirectionalLight(0xfff2da, 0.92);
+sun.position.set(16, 24, 11);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -24; sun.shadow.camera.right = 24;
+sun.shadow.camera.top = 24;   sun.shadow.camera.bottom = -24;
+sun.shadow.camera.near = 4;   sun.shadow.camera.far = 74;
+sun.shadow.bias = -0.0014;
+scene.add(sun);
+scene.add(sun.target);
 
-setupCounter(document.querySelector('#counter'))
+// luz do vulcão — criada sempre, para nunca recompilar shaders em tempo de jogo
+const lavaLight = new THREE.PointLight(0xff7a2a, 0, 11, 2);
+scene.add(lavaLight);
+
+const SPAN = (GRID_R + 4) * SQ3 * SIZE * 2;
+const waterGeo = new THREE.PlaneGeometry(SPAN, SPAN, 44, 44);
+const water = new THREE.Mesh(waterGeo, new THREE.MeshPhongMaterial({
+  color:0x74b1dc, transparent:true, opacity:0.80, shininess:70, specular:0xa8d6f0
+}));
+water.rotation.x = -Math.PI/2;
+water.position.y = 0.03;
+water.receiveShadow = true;
+scene.add(water);
+const waterBase = waterGeo.attributes.position.array.slice();
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(SPAN, SPAN),
+  new THREE.MeshPhongMaterial({ color:0x3d7096, shininess:0 }));
+floor.rotation.x = -Math.PI/2;
+floor.position.y = BOTTOM - 0.05;
+scene.add(floor);
+
+const ringGeo = new THREE.BufferGeometry();
+ringGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(18), 3));
+const ring = new THREE.LineLoop(ringGeo,
+  new THREE.LineBasicMaterial({ color:0xffffff, transparent:true, opacity:0.9 }));
+ring.frustumCulled = false;
+ring.visible = false;
+scene.add(ring);
+
+/* ═══════════════════════════════════════════════════════
+   Sistemas do mundo
+   ═══════════════════════════════════════════════════════ */
+const terrainMaterial = createTerrainMaterial(renderer);
+const scatter = createScatterSystem(scene);
+const volcano = createVolcanoSystem(scene, lavaLight);
+const mesh = createMeshSystem(scene, terrainMaterial.material, scatter, volcano);
+
+const hud = createHud({
+  onNewIsland: function(){ newIsland(); rebuild(); },
+  onClear: function(){ clearAll(); rebuild(); },
+  onToggleVeg: function(on){ showVeg = on; rebuild(); },
+  onToggleSun: function(on){
+    renderer.shadowMap.enabled = on;
+    scene.traverse(function(o){ if (o.material) o.material.needsUpdate = true; });
+  }
+});
+
+let showVeg = true;
+function rebuild(){
+  const stats = mesh.rebuild(showVeg);
+  hud.setStats(stats);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Seleção
+   ═══════════════════════════════════════════════════════ */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function pick(px, py){
+  const rect = canvas.getBoundingClientRect();
+  ndc.x =  ((px - rect.left)/rect.width )*2 - 1;
+  ndc.y = -((py - rect.top )/rect.height)*2 + 1;
+  ray.setFromCamera(ndc, camera);
+  const terrain = mesh.getTerrain();
+  if (terrain){
+    const hit = ray.intersectObject(terrain, false);
+    if (hit.length) return mesh.getFaceCell()[hit[0].faceIndex] || null;
+  }
+  const hw = ray.intersectObject(water, false);
+  if (hw.length){
+    const qr = worldToHex(hw[0].point.x, hw[0].point.z);
+    return cells.get(kcell(qr[0], qr[1])) || null;
+  }
+  return null;
+}
+function showRing(c){
+  if (!c || !c.cor){ ring.visible = false; return; }
+  const a = ringGeo.attributes.position.array;
+  for (let i = 0; i < 6; i++){
+    a[i*3]   = c.cor[i].p[0];
+    a[i*3+1] = Math.max(c.cor[i].p[1] + 0.05, 0.10);  // sobre a água também
+    a[i*3+2] = c.cor[i].p[2];
+  }
+  ringGeo.attributes.position.needsUpdate = true;
+  ring.visible = true;
+}
+function hover(px, py){ showRing(pick(px, py)); }
+function edit(px, py, d){
+  const c = pick(px, py);
+  if (!c) return;
+  const h = Math.max(0, Math.min(MAXH, c.h + d));
+  if (h === c.h) return;
+  c.h = h;
+  rebuild();
+  showRing(c);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Câmera
+   ═══════════════════════════════════════════════════════ */
+const { applyCamera } = createCameraControls({
+  canvas: canvas, camera: camera, gridR: GRID_R, sq3: SQ3, size: SIZE,
+  onTap: edit, onHover: hover
+});
+
+/* ═══════════════════════════════════════════════════════
+   Loop e interface
+   ═══════════════════════════════════════════════════════ */
+function resize(){
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+const wpos = waterGeo.attributes.position;
+function animate(ms){
+  const t = ms*0.001;
+  for (let i = 0; i < wpos.count; i++){
+    const x = waterBase[i*3], y = waterBase[i*3+1];
+    wpos.array[i*3+2] = Math.sin(x*0.35 + t*0.9)*0.055 + Math.cos(y*0.42 - t*1.2)*0.045;
+  }
+  wpos.needsUpdate = true;
+  terrainMaterial.setTime(t);
+  volcano.update(t);
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+
+newIsland();
+rebuild();
+resize();
+applyCamera();
+hud.removeBoot();
+requestAnimationFrame(animate);
