@@ -5,6 +5,7 @@ import { createMeshSystem } from './world/mesh.js';
 import { createScatterSystem } from './world/scatter.js';
 import { createVolcanoSystem } from './world/volcano.js';
 import { createDinoSystem } from './world/dinos.js';
+import { createNestSystem } from './world/nests.js';
 import { createTerrainMaterial } from './render/terrainMaterial.js';
 import { createWaterMaterial } from './render/waterMaterial.js';
 import { createCameraControls } from './input/camera.js';
@@ -73,10 +74,11 @@ const terrainMaterial = createTerrainMaterial(renderer);
 const scatter = createScatterSystem(scene);
 const volcano = createVolcanoSystem(scene, lavaLight);
 const mesh = createMeshSystem(scene, terrainMaterial.material, scatter, volcano);
+const nests = createNestSystem(scene);
 
 const hud = createHud({
-  onNewIsland: function(){ newIsland(); rebuild(); },
-  onClear: function(){ clearAll(); rebuild(); },
+  onNewIsland: function(){ newIsland(); nests.clear(); rebuild(); },
+  onClear: function(){ clearAll(); nests.clear(); rebuild(); },
   onToggleVeg: function(on){ showVeg = on; rebuild(); },
   onToggleSun: function(on){
     renderer.shadowMap.enabled = on;
@@ -169,13 +171,14 @@ function animate(ms){
   wpos.needsUpdate = true;
   terrainMaterial.setTime(t);
   volcano.update(t);
+  nests.update(t);
   dinos.update(dt, t);
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
 
 newIsland();
-const dinos = createDinoSystem(scene, scatter, renderer);
+const dinos = createDinoSystem(scene, scatter, renderer, nests);
 rebuild();
 resize();
 applyCamera();

@@ -12,8 +12,11 @@ import { createDinoMaterial } from '../render/dinoMaterial.js';
 // estados vagar → procurarComida → comer → ocioso; o voador procura picos).
 // cores escolhidas perto da paleta que o terreno/água já usam (ver
 // render/terrainMaterial.js e render/waterMaterial.js), pra não destoar.
+// herd: true faz a espécie tender a ficar perto dos outros da mesma espécie
+// (ver pickWanderTarget) — só entra em jogo enquanto o bicho está vagando
+// à toa; procurando comida, ele se afasta da manada se precisar.
 const SPECIES = [
-  { key:'braquiossauro', bioma:'terrestre', food:'tall', count:2,
+  { key:'braquiossauro', bioma:'terrestre', food:'tall', count:2, herd:true,
     speedMin:0.35, speedMax:0.55, sizeMin:1.00, sizeMax:1.25,
     color:[0.44, 0.53, 0.38] },
   { key:'pequeno', bioma:'terrestre', food:'bush', count:3,
@@ -24,7 +27,10 @@ const SPECIES = [
     color:[0.50, 0.52, 0.57] },
   { key:'aquatico', bioma:'aquatico', food:null, count:2,
     speedMin:0.80, speedMax:1.20, sizeMin:0.90, sizeMax:1.20,
-    color:[0.19, 0.40, 0.50] }
+    color:[0.19, 0.40, 0.50] },
+  { key:'triceratopo', bioma:'terrestre', food:'cycad', count:2, herd:true,
+    speedMin:0.55, speedMax:0.75, sizeMin:0.85, sizeMax:1.05,
+    color:[0.50, 0.46, 0.34] }
 ];
 
 const WANDER_RADIUS      = 5;    // raio (m) do próximo ponto ao vagar
@@ -47,6 +53,8 @@ const WING_FLAP_FREQ     = 5;    // cadência do batimento (fixa: voa sempre no 
 const TAIL_SWAY_AMP      = 0.35; // rad — quanto a cauda balança nadando
 const TAIL_SWAY_FREQ     = 3.2;  // cadência da nadada, multiplicada pela velocidade do bicho
 const PEAK_MIN_LEVEL     = 8;    // a partir de que altura uma célula conta como "montanha" pro voador
+const HERD_RADIUS        = 7;    // até quão longe do centro da manada um bicho "de manada" pode vagar
+const NEST_CHANCE        = 0.15; // chance de botar um ninho ao acabar de comer, em terreno bom
 
 const STATE = { WANDER:'vagar', SEEK:'procurarComida', EAT:'comer', IDLE:'ocioso' };
 
@@ -238,11 +246,58 @@ function buildAquatico(mat, bellyMat){
   return { group: g, legs: [], wings: [], tail: tail };
 }
 
+function buildTriceratopo(mat, bellyMat){
+  const g = new THREE.Group();
+  const body = part(g, new THREE.BoxGeometry(0.95, 0.42, 0.56), mat);
+  body.position.set(-0.05, 0.42, 0);
+  const belly = part(g, new THREE.BoxGeometry(0.75, 0.12, 0.46), bellyMat);
+  belly.position.set(-0.05, 0.22, 0);
+  const head = part(g, new THREE.BoxGeometry(0.34, 0.28, 0.38), mat);
+  head.position.set(0.56, 0.50, 0);
+  const beak = part(g, new THREE.ConeGeometry(0.10, 0.20, 5), mat);
+  beak.rotation.z = -Math.PI/2;
+  beak.position.set(0.78, 0.44, 0);
+  // folho atrás da cabeça
+  const frill = part(g, new THREE.CylinderGeometry(0.34, 0.30, 0.05, 8), mat);
+  frill.rotation.x = Math.PI/2;
+  frill.rotation.z = 0.15;
+  frill.position.set(0.30, 0.58, 0);
+  // três chifres: dois na testa, um no focinho
+  const browHornGeo = new THREE.ConeGeometry(0.035, 0.30, 5);
+  for (const ez of [0.11, -0.11]){
+    const horn = part(g, browHornGeo, mat);
+    horn.position.set(0.62, 0.68, ez);
+    horn.rotation.z = -Math.PI*0.42;
+    horn.rotation.y = ez > 0 ? -0.15 : 0.15;
+  }
+  const noseHorn = part(g, new THREE.ConeGeometry(0.03, 0.14, 5), mat);
+  noseHorn.position.set(0.76, 0.52, 0);
+  noseHorn.rotation.z = -Math.PI*0.38;
+  const eyeGeo = new THREE.SphereGeometry(0.022, 6, 5);
+  for (const ez of [0.13, -0.13]){
+    const eye = part(g, eyeGeo, EYE_MAT);
+    eye.position.set(0.62, 0.52, ez);
+  }
+  // cauda curta — ceratopsídeos não têm cauda longa como os saurópodes
+  const tailPart = part(g, new THREE.CylinderGeometry(0.05, 0.10, 0.32, 6), mat);
+  tailPart.position.set(-0.62, 0.36, 0);
+  tailPart.rotation.z = Math.PI*0.46;
+  // pernas — quadrúpede, mesmo trote diagonal do braquiossauro
+  const legGeo = new THREE.CylinderGeometry(0.075, 0.09, 0.46, 7);
+  const legs = [];
+  for (const lx of [0.32, -0.32]) for (const lz of [0.20, -0.20]){
+    const pivot = addLeg(g, lx, 0.46, lz, legGeo, mat, 0.46);
+    legs.push({ pivot: pivot, phase: (lx*lz > 0) ? 0 : Math.PI });
+  }
+  return { group: g, legs: legs, wings: [], tail: null };
+}
+
 const BUILDERS = {
   braquiossauro: buildBraquiossauro,
   pequeno: buildPequeno,
   pterossauro: buildPterossauro,
-  aquatico: buildAquatico
+  aquatico: buildAquatico,
+  triceratopo: buildTriceratopo
 };
 
 /* ═══════════════════════════════════════════════════════
@@ -271,8 +326,35 @@ function randomStart(def){
 /* ═══════════════════════════════════════════════════════
    Máquina de estados: vagar → procurar comida → comer → ocioso
    ═══════════════════════════════════════════════════════ */
-function pickWanderTarget(d){
+// centro da manada: média da posição dos outros da mesma espécie, sem
+// limite de distância (com só 2-3 indivíduos por espécie, "o resto da
+// manada" é sempre relevante, não só quem está por perto).
+function herdCentroid(d, allDinos){
+  let sx = 0, sz = 0, n = 0;
+  for (let i = 0; i < allDinos.length; i++){
+    const o = allDinos[i];
+    if (o === d || o.def.key !== d.def.key) continue;
+    sx += o.pos.x; sz += o.pos.z; n++;
+  }
+  return n ? { x: sx/n, z: sz/n } : null;
+}
+
+function pickWanderTarget(d, allDinos){
   const def = d.def;
+  if (def.herd){
+    const centroid = herdCentroid(d, allDinos);
+    if (centroid){
+      const dx = centroid.x - d.pos.x, dz = centroid.z - d.pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > HERD_RADIUS){
+        // longe demais da manada: anda na direção dela em vez de vagar à toa
+        const step = Math.min(WANDER_RADIUS, dist - HERD_RADIUS*0.5);
+        const nx = d.pos.x + (dx/dist)*step, nz = d.pos.z + (dz/dist)*step;
+        if (isLand(nx, nz)) return new THREE.Vector3(nx, 0, nz);
+        // ponto direto caiu na água ou fora do mapa: cai pro sorteio normal
+      }
+    }
+  }
   for (let i = 0; i < 8; i++){
     const a = Math.random() * Math.PI * 2;
     const r = Math.random() * WANDER_RADIUS;
@@ -293,10 +375,10 @@ function pickPeakTarget(){
   return new THREE.Vector3(cxOf(c.q, c.r), 0, czOf(c.q, c.r));
 }
 
-function pickFoodTarget(d, scatter){
+function pickFoodTarget(d, scatter, allDinos){
   const def = d.def;
-  if (def.bioma === 'voador') return pickPeakTarget() || pickWanderTarget(d);
-  if (!def.food) return pickWanderTarget(d); // sem planta alvo: simula forrageio
+  if (def.bioma === 'voador') return pickPeakTarget() || pickWanderTarget(d, allDinos);
+  if (!def.food) return pickWanderTarget(d, allDinos); // sem planta alvo: simula forrageio
 
   let best = null, bestD2 = FOOD_SEARCH_RADIUS * FOOD_SEARCH_RADIUS;
   const spots = scatter.getPositions(def.food);
@@ -306,7 +388,7 @@ function pickFoodTarget(d, scatter){
     const d2 = dx*dx + dz*dz;
     if (d2 < bestD2){ bestD2 = d2; best = p; }
   }
-  return best ? new THREE.Vector3(best.x, 0, best.z) : pickWanderTarget(d);
+  return best ? new THREE.Vector3(best.x, 0, best.z) : pickWanderTarget(d, allDinos);
 }
 
 function arrived(d){
@@ -370,21 +452,34 @@ function animateTail(d, time){
   d.tail.rotation.y = swimming ? Math.sin(time*TAIL_SWAY_FREQ*d.speed) * TAIL_SWAY_AMP : 0;
 }
 
-function stepDino(d, dt, time, scatter){
+// ao acabar de comer, num bicho terrestre, chance de deixar um ninho ali —
+// só em terreno bom (mesma faixa de altura em que a vegetação cresce)
+function maybeLayNest(d, time, nests){
+  if (!nests || d.def.bioma !== 'terrestre') return;
+  if (Math.random() > NEST_CHANCE) return;
+  const y = heightAt(d.pos.x, d.pos.z);
+  if (y < 0.30 || y > 3.2) return;
+  nests.layNest(d.pos.x, d.pos.z, time);
+}
+
+function stepDino(d, dt, time, scatter, allDinos, nests){
   switch (d.state){
     case STATE.WANDER:
-      if (!d.target) d.target = pickWanderTarget(d);
+      if (!d.target) d.target = pickWanderTarget(d, allDinos);
       moveToward(d, dt);
       if (arrived(d)){ d.target = null; d.state = STATE.SEEK; }
       break;
     case STATE.SEEK:
-      if (!d.target) d.target = pickFoodTarget(d, scatter);
+      if (!d.target) d.target = pickFoodTarget(d, scatter, allDinos);
       moveToward(d, dt);
       if (arrived(d)){ d.target = null; d.state = STATE.EAT; d.timer = EAT_DURATION; }
       break;
     case STATE.EAT:
       d.timer -= dt;
-      if (d.timer <= 0){ d.state = STATE.IDLE; d.timer = randRange(IDLE_MIN, IDLE_MAX); }
+      if (d.timer <= 0){
+        maybeLayNest(d, time, nests);
+        d.state = STATE.IDLE; d.timer = randRange(IDLE_MIN, IDLE_MAX);
+      }
       break;
     case STATE.IDLE:
       d.timer -= dt;
@@ -400,7 +495,7 @@ function stepDino(d, dt, time, scatter){
 /* ═══════════════════════════════════════════════════════
    Sistema
    ═══════════════════════════════════════════════════════ */
-export function createDinoSystem(scene, scatter, renderer){
+export function createDinoSystem(scene, scatter, renderer, nests){
   const dinos = [];
 
   function spawnOne(def){
@@ -447,7 +542,7 @@ export function createDinoSystem(scene, scatter, renderer){
   syncFlyers();
 
   function update(dt, time){
-    for (let i = 0; i < dinos.length; i++) stepDino(dinos[i], dt, time, scatter);
+    for (let i = 0; i < dinos.length; i++) stepDino(dinos[i], dt, time, scatter, dinos, nests);
   }
 
   return { update, onTerrainChanged: syncFlyers };
