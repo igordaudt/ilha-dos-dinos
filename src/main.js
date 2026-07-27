@@ -135,7 +135,8 @@ function showRing(c){
   ring.visible = true;
 }
 function hover(px, py){ showRing(pick(px, py)); }
-const FOSSIL_CHANCE = 0.12; // chance de achar um fóssil ao cavar, só pra ser divertido
+const FOSSIL_CHANCE = 0.12;  // chance de achar um fóssil ao cavar, só pra ser divertido
+const FOSSIL_MAX_STAGE = 3;  // no estágio 3 o fóssil aparece por completo
 function edit(px, py, d){
   const c = pick(px, py);
   if (!c) return;
@@ -146,8 +147,11 @@ function edit(px, py, d){
   audio.unlock();
   if (dug){
     audio.playDig();
-    if (!c.fossil && Math.random() < FOSSIL_CHANCE){
-      c.fossil = true;
+    if (c.fossilStage === 0 && Math.random() < FOSSIL_CHANCE){
+      c.fossilStage = 1; // achou — ainda são só alguns ossos
+      audio.playFossil();
+    } else if (c.fossilStage > 0 && c.fossilStage < FOSSIL_MAX_STAGE){
+      c.fossilStage++; // cavando mais fundo no mesmo lugar, aparece mais fóssil
       audio.playFossil();
     }
   } else {

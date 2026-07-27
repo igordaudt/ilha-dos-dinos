@@ -5,6 +5,9 @@ import {
 } from './grid.js';
 import { terrainColor } from '../render/terrainMaterial.js';
 
+const CAVE_MIN_DIFF = 7;    // diferença mínima de altura entre os dois lados pra virar parede de caverna
+const CAVE_CHANCE   = 0.28; // chance de uma aresta íngreme virar caverna — rolada só uma vez
+
 // Superfície curva via triângulos PN. Cada triângulo grosseiro (centro + dois
 // cantos) vira um retalho de Bézier cúbico definido pelas normais dos
 // vértices. Como a borda do retalho depende só dos dois vértices que ela
@@ -244,10 +247,38 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
                 mid[1] + (C[i].p[1]-mid[1])*t,
                 mid[2] + (C[i].p[2]-mid[2])*t + (jx ? (R()-0.5)*jx : 0)];
       }
-      if (c.fossil){
+      if (c.fossilStage > 0){
         const p = spot(Math.floor(R()*6), 0.15 + R()*0.5, 0.10);
         const s = 0.75 + R()*0.5;
-        scatter.add('fossil', p[0], p[1] - 0.02, p[2], s, s, s, R()*6.28, 0);
+        scatter.add('fossil' + c.fossilStage, p[0], p[1] - 0.02, p[2], s, s, s, R()*6.28, 0);
+      }
+
+      // caverna: paredão íngreme (diferença de altura pro vizinho ≥
+      // CAVE_MIN_DIFF, não importa se o lado baixo é água ou terra) sorteia
+      // UMA vez se vira caverna; o resultado (sim ou não) fica valendo pra
+      // sempre pra essa célula, não sorteia de novo
+      if (c.caveDir === -1){
+        for (let i = 0; i < 6; i++){
+          const nb = cells.get(kcell(c.q + DIRS[i][0], c.r + DIRS[i][1]));
+          if (!nb) continue;
+          if (c.h - nb.h >= CAVE_MIN_DIFF){
+            c.caveDir = (Math.random() < CAVE_CHANCE) ? i : -2;
+            break;
+          }
+        }
+      }
+      if (c.caveDir >= 0){
+        const nb = cells.get(kcell(c.q + DIRS[c.caveDir][0], c.r + DIRS[c.caveDir][1]));
+        if (nb){
+          const a = C[c.caveDir].p, b = C[(c.caveDir+1)%6].p;
+          const ex = (a[0]+b[0])/2, ez = (a[2]+b[2])/2;
+          const loY = nb.h*STEP, hiY = topY;
+          const ey = loY + (hiY - loY)*0.35; // parte de baixo do paredão, não na crista
+          const dx = cxOf(nb.q,nb.r) - cxOf(c.q,c.r), dz = czOf(nb.q,nb.r) - czOf(c.q,c.r);
+          const ry = Math.atan2(-dz, dx); // vira a boca pra fora do paredão
+          const s = 0.9 + R()*0.5;
+          scatter.add('cave', ex, ey, ez, s, s, s, ry, 0);
+        }
       }
       if (c.volcano || c.scorch > 0.3){
         for (let j = 0; j < 3; j++){

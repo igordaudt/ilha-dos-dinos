@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { hash } from './grid.js';
+import { hash, clamp01 } from './grid.js';
 
 // Vegetação e pedras em InstancedMesh, posições por PRNG semeado em (q,r)
 // para não teleportarem quando o terreno muda em outro lugar.
@@ -110,9 +110,24 @@ function logGeo(){
   t.rotateZ(Math.PI/2); t.translate(0, 0.05, 0);
   return bake([{ geo:t, col:[0.36,0.29,0.22], jit:0.20 }]);
 }
-// fóssil: achado raro ao cavar — costelas meio enterradas e um crânio,
-// num tom osso que não se confunde com pedra nem com madeira
-function fossilGeo(){
+// fóssil, em três estágios de escavação — cavar mais um nível no mesmo
+// lugar revela mais osso, como se estivéssemos escavando de verdade.
+// Tom osso que não se confunde com pedra nem com madeira.
+
+// estágio 1: "alguns ossos" — a descoberta, bem discreta
+function fossilGeo1(){
+  const parts = [];
+  const rib = new THREE.TorusGeometry(0.14, 0.016, 5, 7, Math.PI*0.7);
+  rib.rotateX(Math.PI/2); rib.translate(0, 0.02, 0);
+  parts.push({ geo:rib, col:[0.85,0.81,0.71], jit:0.12 });
+  const shard = new THREE.CylinderGeometry(0.014, 0.018, 0.18, 5);
+  shard.rotateZ(Math.PI*0.4);
+  shard.translate(0.10, 0.02, -0.10);
+  parts.push({ geo:shard, col:[0.82,0.78,0.68], jit:0.14 });
+  return bake(parts);
+}
+// estágio 2: mais um pouco de escavação — costelas e o crânio aparecendo
+function fossilGeo2(){
   const parts = [];
   const rib1 = new THREE.TorusGeometry(0.16, 0.018, 5, 8, Math.PI*0.85);
   rib1.rotateX(Math.PI/2); rib1.translate(0, 0.02, 0.02);
@@ -128,6 +143,108 @@ function fossilGeo(){
   shard.rotateZ(Math.PI*0.45);
   shard.translate(0.02, 0.02, -0.14);
   parts.push({ geo:shard, col:[0.82,0.78,0.68], jit:0.14 });
+  return bake(parts);
+}
+// estágio 3: esqueleto completo à mostra — caixa torácica dos dois lados,
+// coluna de vértebras, crânio e um osso de perna solto ao lado
+// estágio 3: esqueleto completo, desenhado como um estegossauro de propósito
+// — placas nas costas e os quatro espinhos na cauda (thagomizo) são as duas
+// marcas que dão pra reconhecer de cara qual dinossauro é, mesmo só de osso.
+function fossilGeo3(){
+  const parts = [];
+  const boneA = [0.85,0.81,0.71], boneB = [0.83,0.79,0.69], boneC = [0.88,0.85,0.76];
+  const HEAD_X = 0.42, TAIL_X = -0.48;
+  function spineY(x){
+    const t = clamp01((HEAD_X - x) / (HEAD_X - TAIL_X)); // 0 na cabeça, 1 na cauda
+    return 0.03 + Math.sin(t*Math.PI)*0.10; // arco subindo sobre o quadril
+  }
+
+  // crânio pequeno e baixo — o estegossauro tinha uma cabecinha desproporcional
+  const skull = new THREE.IcosahedronGeometry(0.075, 0);
+  skull.scale(1.5, 0.55, 0.8);
+  skull.translate(HEAD_X, spineY(HEAD_X) + 0.01, 0);
+  parts.push({ geo:skull, col:boneC, jit:0.08 });
+
+  // coluna em arco, seguindo a corcunda sobre o quadril
+  const SPINE_N = 7;
+  for (let i = 0; i < SPINE_N; i++){
+    const x = HEAD_X + (TAIL_X - HEAD_X)*(i/(SPINE_N-1));
+    const vert = new THREE.SphereGeometry(0.026, 5, 4);
+    vert.translate(x, spineY(x), 0);
+    parts.push({ geo:vert, col:boneB, jit:0.10 });
+  }
+
+  // costelas, só na metade da frente (onde fica a caixa torácica)
+  for (const side of [1, -1]){
+    for (let i = 0; i < 3; i++){
+      const x = 0.18 - i*0.14;
+      const rib = new THREE.TorusGeometry(0.095 - i*0.008, 0.011, 5, 6, Math.PI*0.7);
+      rib.rotateX(Math.PI/2);
+      rib.rotateY(side*0.2);
+      rib.translate(x, spineY(x) - 0.02, side*0.03);
+      parts.push({ geo:rib, col:boneA, jit:0.10 });
+    }
+  }
+
+  // placas nas costas — duas fileiras alternadas, em cima do arco da coluna
+  const plateX = [0.22, 0.08, -0.06, -0.20, -0.34];
+  for (let i = 0; i < plateX.length; i++){
+    const side = (i % 2 === 0) ? 1 : -1;
+    const plate = new THREE.ConeGeometry(0.065, 0.16, 4);
+    plate.scale(1, 1, 0.32); // achata pra virar uma placa fina, não um cone gordo
+    plate.translate(plateX[i], spineY(plateX[i]) + 0.09, side*0.045);
+    plate.rotateY(side*0.35);
+    parts.push({ geo:plate, col:boneC, jit:0.06 });
+  }
+
+  // pernas traseiras mais compridas que as dianteiras — postura arqueada
+  const backLeg = new THREE.CylinderGeometry(0.024, 0.030, 0.28, 6);
+  backLeg.translate(-0.28, -0.08, 0.14);
+  parts.push({ geo:backLeg, col:boneA, jit:0.10 });
+  const frontLeg = new THREE.CylinderGeometry(0.018, 0.024, 0.18, 6);
+  frontLeg.translate(0.26, -0.06, 0.13);
+  parts.push({ geo:frontLeg, col:boneA, jit:0.10 });
+
+  // cauda com os quatro espinhos — a outra marca registrada do bicho
+  for (let i = 0; i < 4; i++){
+    const side = i < 2 ? 1 : -1;
+    const spike = new THREE.ConeGeometry(0.022, 0.16, 5);
+    spike.rotateZ(side*Math.PI*0.32);
+    spike.rotateY((i % 2)*0.3);
+    spike.translate(TAIL_X - 0.05, 0.02, side*0.05);
+    parts.push({ geo:spike, col:boneC, jit:0.08 });
+  }
+
+  return bake(parts);
+}
+
+// boca de caverna: um vazio escuro emoldurado por pedra, encaixado numa
+// parede íngreme — decoração colocada na aresta entre dois hexágonos, não
+// um espaço navegável de verdade (o terreno aqui é uma superfície contínua,
+// não dá pra "cavar" um interior nele). Construída com a face virada pro
+// eixo +X local — quem posiciona (world/mesh.js) gira isso pra fora do
+// paredão, do jeito que os dinos já viram na direção que andam.
+function caveGeo(){
+  const parts = [];
+  const rockCol = [0.46,0.44,0.41], darkCol = [0.045,0.045,0.05];
+  // vazio escuro, achatado e um pouco recuado — a "boca"
+  const voidGeo = new THREE.IcosahedronGeometry(0.32, 1);
+  voidGeo.scale(0.30, 1.0, 0.85);
+  voidGeo.translate(-0.06, 0, 0);
+  parts.push({ geo:voidGeo, col:darkCol, jit:0.04 });
+  // moldura de pedra em arco ao redor da boca
+  const arch = new THREE.TorusGeometry(0.36, 0.11, 6, 10, Math.PI*1.35);
+  arch.rotateY(Math.PI/2);
+  arch.rotateZ(-Math.PI*0.18);
+  parts.push({ geo:arch, col:rockCol, jit:0.18 });
+  // blocos caídos na base, tipo entulho de desmoronamento
+  const rubble = [[0.10,-0.28,0.20,0.13], [0.16,-0.32,-0.16,0.11], [0.04,-0.34,0.02,0.10]];
+  for (let i = 0; i < rubble.length; i++){
+    const [rx, ry, rz, rs] = rubble[i];
+    const rGeo = new THREE.IcosahedronGeometry(rs, 0);
+    rGeo.translate(rx, ry, rz);
+    parts.push({ geo:rGeo, col:rockCol, jit:0.26 });
+  }
   return bake(parts);
 }
 
@@ -157,7 +274,10 @@ export function createScatterSystem(scene){
     tuft   : makeIM(tuftGeo(),    2600, false),
     flowerA: makeIM(flowerGeo([0.94,0.80,0.34]), 450, false),
     flowerB: makeIM(flowerGeo([0.88,0.55,0.68]), 350, false),
-    fossil : makeIM(fossilGeo(), 60, false)
+    fossil1: makeIM(fossilGeo1(), 40, false),
+    fossil2: makeIM(fossilGeo2(), 40, false),
+    fossil3: makeIM(fossilGeo3(), 24, false),
+    cave   : makeIM(caveGeo(), 20, false)
   };
   const DKEYS = Object.keys(D);
   const N = {};
