@@ -1,4 +1,4 @@
-export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound }){
+export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig }){
   const hud = document.getElementById('hud');
   const head = document.getElementById('head');
   head.addEventListener('click', function(){
@@ -25,6 +25,15 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
     const on = bSound.getAttribute('aria-pressed') !== 'true';
     bSound.setAttribute('aria-pressed', String(on));
     onToggleSound(on);
+  });
+
+  const bMode = document.getElementById('btn-mode');
+  bMode.addEventListener('click', function(){
+    const digging = bMode.getAttribute('aria-pressed') !== 'true';
+    bMode.setAttribute('aria-pressed', String(digging));
+    bMode.querySelector('.ico').textContent = digging ? '⛏️' : '⛰️';
+    bMode.querySelector('.txt').textContent = digging ? 'descer' : 'subir';
+    onToggleDig(digging);
   });
 
   const elN = document.getElementById('n');

@@ -91,10 +91,12 @@ const hud = createHud({
     audio.unlock();
     audio.setMuted(!on);
     audio.playClick(); // só toca se "on" for true — playClick já respeita o mudo
-  }
+  },
+  onToggleDig: function(on){ audio.unlock(); audio.playClick(); digMode = on; }
 });
 
 let showVeg = true;
+let digMode = false; // touch não tem shift+clique nem botão direito, então o botão "descer" força o afundamento
 function rebuild(){
   const stats = mesh.rebuild(showVeg);
   hud.setStats(stats);
@@ -166,7 +168,7 @@ function edit(px, py, d){
    ═══════════════════════════════════════════════════════ */
 const { applyCamera } = createCameraControls({
   canvas: canvas, camera: camera, gridR: GRID_R, sq3: SQ3, size: SIZE,
-  onTap: edit, onHover: hover
+  onTap: function(px, py, d){ edit(px, py, digMode ? -1 : d); }, onHover: hover
 });
 
 /* ═══════════════════════════════════════════════════════
