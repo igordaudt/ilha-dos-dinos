@@ -182,7 +182,7 @@ function edit(px, py, d){
 /* ═══════════════════════════════════════════════════════
    Câmera
    ═══════════════════════════════════════════════════════ */
-const { applyCamera } = createCameraControls({
+const { cam, applyCamera } = createCameraControls({
   canvas: canvas, camera: camera, gridR: GRID_R, sq3: SQ3, size: SIZE,
   onTap: function(px, py, d){ edit(px, py, digMode ? -1 : d); }, onHover: hover
 });
@@ -199,16 +199,21 @@ function resize(){
 window.addEventListener('resize', resize);
 
 const wpos = waterGeo.attributes.position;
+// a ondulação é sutil (não recalcula normais, então nem afeta o brilho) —
+// de longe dá pra nem mexer nela, e isso poupa um loop de 2000 senos/frame
+const WATER_ANIM_MAX_DIST = 40;
 let lastMs = null;
 function animate(ms){
   const t = ms*0.001;
   const dt = lastMs === null ? 0 : (ms - lastMs)*0.001;
   lastMs = ms;
-  for (let i = 0; i < wpos.count; i++){
-    const x = waterBase[i*3], y = waterBase[i*3+1];
-    wpos.array[i*3+2] = Math.sin(x*0.35 + t*0.9)*0.055 + Math.cos(y*0.42 - t*1.2)*0.045;
+  if (cam.dist < WATER_ANIM_MAX_DIST){
+    for (let i = 0; i < wpos.count; i++){
+      const x = waterBase[i*3], y = waterBase[i*3+1];
+      wpos.array[i*3+2] = Math.sin(x*0.35 + t*0.9)*0.055 + Math.cos(y*0.42 - t*1.2)*0.045;
+    }
+    wpos.needsUpdate = true;
   }
-  wpos.needsUpdate = true;
   terrainMaterial.setTime(t);
   volcano.update(t);
   nests.update(t);
