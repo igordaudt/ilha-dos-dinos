@@ -67,3 +67,26 @@ button.act[aria-pressed="false"]{ opacity:.45; }
 #btn-fullscreen[hidden]{ display:none; }
 #boot{ position:fixed; inset:0; z-index:20; display:flex; align-items:center;
   justify-content:center; background:#dbe8f1; font-size:14px; letter-spacing:.5px; }
+
+/* termômetro/higrômetro/pressostato — só decoração e curiosidade sobre o
+   clima do período, valores fixos, não são leituras de verdade */
+#weather{ position:fixed; right:12px; top:50%; transform:translateY(-50%); z-index:10;
+  display:flex; flex-direction:column; align-items:flex-end; gap:6px; user-select:none; }
+#weather .lbl{ margin:0 2px 2px; font-size:9.5px; text-transform:uppercase;
+  letter-spacing:.06em; opacity:.55; }
+#weather .wdg{ display:flex; align-items:center; gap:6px; background:var(--paper);
+  border:2px solid var(--edge); border-radius:10px; padding:4px 9px; font-size:11.5px;
+  font-weight:bold; box-shadow:0 4px 12px rgba(50,60,58,.14); cursor:default;
+  animation:weatherSway 5s ease-in-out infinite; }
+#weather .wdg:nth-child(3){ animation-delay:.5s; }
+#weather .wdg:nth-child(4){ animation-delay:1s; }
+#weather .ic{ font-size:14px; }
+@keyframes weatherSway{
+  0%, 100%{ transform:rotate(0deg); }
+  50%{ transform:rotate(-4deg); }
+}
+@media (prefers-reduced-motion: reduce){ #weather .wdg{ animation:none; } }
+
+/* dia/noite tem duas cores próprias — sol de dia, lua à noite — em vez do
+   esmaecimento genérico, pra ficar claro qual dos dois está ativo */
+#btn-night[aria-pressed="true"]{ background:#33416e; color:#fff; border-color:#232f52; }

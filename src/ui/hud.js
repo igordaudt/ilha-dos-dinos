@@ -1,4 +1,4 @@
-export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen, shadowsOn, jurassic, onToggleJurassic }){
+export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen, onToggleNight, shadowsOn, jurassic, onToggleJurassic }){
   const hud = document.getElementById('hud');
   const head = document.getElementById('head');
   head.addEventListener('click', function(){
@@ -26,6 +26,13 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
     const on = bSound.getAttribute('aria-pressed') !== 'true';
     bSound.setAttribute('aria-pressed', String(on));
     onToggleSound(on);
+  });
+
+  const bNight = document.getElementById('btn-night');
+  bNight.addEventListener('click', function(){
+    const on = bNight.getAttribute('aria-pressed') !== 'true';
+    bNight.setAttribute('aria-pressed', String(on));
+    onToggleNight(on);
   });
 
   const bJur = document.getElementById('btn-jurassic');

@@ -37,8 +37,9 @@ scene.fog = new THREE.Fog(0xdbe8f1, 30, 78);
 
 const camera = new THREE.PerspectiveCamera(38, 1, 0.5, 220);
 
-scene.add(new THREE.HemisphereLight(0xdff0ff, 0x8f8468, 0.66));
-const sun = new THREE.DirectionalLight(0xfff2da, 0.92);
+const hemi = new THREE.HemisphereLight(0xdff0ff, 0x8f8468, 0.66);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2da, 0.92); // vira "luar" à noite, ver applyDayNight()
 sun.position.set(16, 24, 11);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -48,6 +49,23 @@ sun.shadow.camera.near = 4;   sun.shadow.camera.far = 74;
 sun.shadow.bias = -0.0014;
 scene.add(sun);
 scene.add(sun.target);
+
+// dia/noite: só troca cor/intensidade das luzes e o fundo — nenhum material
+// precisa saber disso, a iluminação Phong já reage sozinha. `isNight` fica
+// exposto pra mais tarde ligar/desligar dinos noturnos.
+const DAY_SKY   = { bg:0xdbe8f1, hemiSky:0xdff0ff, hemiGround:0x8f8468, hemiI:0.66, sunColor:0xfff2da, sunI:0.92 };
+const NIGHT_SKY = { bg:0x0c1830, hemiSky:0x24335c, hemiGround:0x11141f, hemiI:0.24, sunColor:0xaec8ff, sunI:0.30 };
+let isNight = false;
+function applyDayNight(){
+  const p = isNight ? NIGHT_SKY : DAY_SKY;
+  scene.background.setHex(p.bg);
+  scene.fog.color.setHex(p.bg);
+  hemi.color.setHex(p.hemiSky);
+  hemi.groundColor.setHex(p.hemiGround);
+  hemi.intensity = p.hemiI;
+  sun.color.setHex(p.sunColor);
+  sun.intensity = p.sunI;
+}
 
 // luz do vulcão — criada sempre, para nunca recompilar shaders em tempo de jogo
 const lavaLight = new THREE.PointLight(0xff7a2a, 0, 11, 2);
@@ -103,6 +121,7 @@ const hud = createHud({
   },
   onToggleDig: function(on){ audio.unlock(); audio.playClick(); digMode = on; },
   onToggleFullscreen: function(){ audio.unlock(); audio.playClick(); },
+  onToggleNight: function(on){ audio.unlock(); audio.playClick(); isNight = on; applyDayNight(); },
   shadowsOn: !pcJurassico,
   jurassic: pcJurassico,
   onToggleJurassic: function(on){
