@@ -15,20 +15,23 @@ import { createDinoMaterial } from '../render/dinoMaterial.js';
 // herd: true faz a espécie tender a ficar perto dos outros da mesma espécie
 // (ver pickWanderTarget) — só entra em jogo enquanto o bicho está vagando
 // à toa; procurando comida, ele se afasta da manada se precisar.
+// label: nome de exibição, usado só na mensagem de "descobriu um fóssil"
+// (ver createDinoSystem() mais abaixo) — o pterossauro não passa por
+// fóssil, mas ganha um label também pra manter a lista uniforme.
 const SPECIES = [
-  { key:'braquiossauro', bioma:'terrestre', food:'tall', count:2, herd:true,
+  { key:'braquiossauro', label:'Braquiossauro', bioma:'terrestre', food:'tall', count:2, herd:true,
     speedMin:0.35, speedMax:0.55, sizeMin:1.00, sizeMax:1.25,
     color:[0.44, 0.53, 0.38] },
-  { key:'pequeno', bioma:'terrestre', food:'bush', count:3,
+  { key:'pequeno', label:'Compsognato', bioma:'terrestre', food:'bush', count:3,
     speedMin:1.10, speedMax:1.60, sizeMin:0.75, sizeMax:1.05,
     color:[0.58, 0.45, 0.31] },
-  { key:'pterossauro', bioma:'voador', food:null, count:2,
+  { key:'pterossauro', label:'Pterossauro', bioma:'voador', food:null, count:2,
     speedMin:1.40, speedMax:2.00, sizeMin:0.85, sizeMax:1.10,
     color:[0.50, 0.52, 0.57] },
-  { key:'aquatico', bioma:'aquatico', food:null, count:2,
+  { key:'aquatico', label:'Plesiossauro', bioma:'aquatico', food:null, count:2,
     speedMin:0.80, speedMax:1.20, sizeMin:0.90, sizeMax:1.20,
     color:[0.19, 0.40, 0.50] },
-  { key:'triceratopo', bioma:'terrestre', food:'cycad', count:2, herd:true,
+  { key:'triceratopo', label:'Triceratopo', bioma:'terrestre', food:'cycad', count:2, herd:true,
     speedMin:0.55, speedMax:0.75, sizeMin:0.85, sizeMax:1.05,
     color:[0.50, 0.46, 0.34] }
 ];
@@ -529,13 +532,33 @@ export function createDinoSystem(scene, scatter, renderer, nests, lowEnd){
     }
   }
 
-  for (const def of SPECIES){
-    if (def.bioma !== 'voador') spawnSpecies(def);
+  // ninguém nasce sozinho mais — só o pterossauro (por pico) e o resto
+  // (por fóssil desenterrado, ver unlockSpecies() abaixo)
+  const NON_FLYING = SPECIES.filter(function(s){ return s.bioma !== 'voador'; });
+  const unlocked = new Set();
+
+  function hasLockedSpecies(){ return unlocked.size < NON_FLYING.length; }
+  function pickLockedSpecies(){
+    const pool = NON_FLYING.filter(function(s){ return !unlocked.has(s.key); });
+    return pool.length ? pool[Math.floor(Math.random()*pool.length)].key : null;
+  }
+  function unlockSpecies(key){
+    if (!key || unlocked.has(key)) return null;
+    const def = NON_FLYING.find(function(s){ return s.key === key; });
+    if (!def) return null;
+    unlocked.add(key);
+    spawnSpecies(def);
+    return def.label;
+  }
+  function resetUnlocked(){
+    unlocked.forEach(function(key){ removeSpecies(key); });
+    unlocked.clear();
   }
 
-  // o voador só existe enquanto houver pelo menos uma montanha nível 9 —
+  // o voador só existe enquanto houver pelo menos uma montanha nível 8+ —
   // como isso normalmente só acontece quando o jogador constrói um vulcão,
   // reavaliamos a cada rebuild() (chamado de main.js), não só na criação.
+  // Não passa pelo esquema de fóssil acima — sem relação com `unlocked`.
   let flying = false;
   function syncFlyers(){
     const can = hasPeak();
@@ -550,5 +573,8 @@ export function createDinoSystem(scene, scatter, renderer, nests, lowEnd){
     for (let i = 0; i < dinos.length; i++) stepDino(dinos[i], dt, time, scatter, dinos, nests);
   }
 
-  return { update, onTerrainChanged: syncFlyers };
+  return {
+    update, onTerrainChanged: syncFlyers,
+    hasLockedSpecies, pickLockedSpecies, unlockSpecies, resetUnlocked
+  };
 }

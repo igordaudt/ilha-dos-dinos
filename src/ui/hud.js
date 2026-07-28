@@ -127,5 +127,14 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
     if (boot) boot.remove();
   }
 
-  return { setStats, removeBoot };
+  const elDiscovery = document.getElementById('discovery');
+  let discoveryTimer = null;
+  function showDiscovery(name){
+    if (discoveryTimer) clearTimeout(discoveryTimer);
+    elDiscovery.textContent = 'Parabéns, você descobriu o ' + name + '!';
+    elDiscovery.classList.add('show');
+    discoveryTimer = setTimeout(function(){ elDiscovery.classList.remove('show'); }, 4000);
+  }
+
+  return { setStats, removeBoot, showDiscovery };
 }

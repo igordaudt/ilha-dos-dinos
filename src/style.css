@@ -105,6 +105,16 @@ button.act[aria-pressed="false"]{ opacity:.45; }
 #boot{ position:fixed; inset:0; z-index:20; display:flex; align-items:center;
   justify-content:center; background:#dbe8f1; font-size:14px; letter-spacing:.5px; }
 
+/* banner de "descobriu um dino" — evento raro e comemorativo, por isso
+   centralizado e chamativo em vez de mais um badge de canto */
+#discovery{ position:fixed; top:12px; left:50%; z-index:15;
+  background:var(--paper); border:2px solid var(--accent); border-radius:12px;
+  padding:8px 18px; font-weight:bold; font-size:13px; text-align:center;
+  box-shadow:0 4px 14px rgba(50,60,58,.2); pointer-events:none; user-select:none;
+  opacity:0; transform:translate(-50%,-140%); transition:transform .35s ease, opacity .35s ease; }
+#discovery.show{ opacity:1; transform:translate(-50%,0); }
+@media (prefers-reduced-motion: reduce){ #discovery{ transition:none; } }
+
 /* termômetro/higrômetro/pressostato — só decoração e curiosidade sobre o
    clima do período, valores fixos, não são leituras de verdade */
 #weather{ position:fixed; right:12px; bottom:54px; z-index:10;

@@ -116,8 +116,8 @@ const audio = createAudioSystem();
 const generateIsland = PANGEA_MODE ? newPangea : newIsland;
 
 const hud = createHud({
-  onNewIsland: function(){ audio.unlock(); audio.playClick(); generateIsland(); nests.clear(); rebuild(); },
-  onClear: function(){ audio.unlock(); audio.playClick(); clearAll(); nests.clear(); rebuild(); },
+  onNewIsland: function(){ audio.unlock(); audio.playClick(); generateIsland(); nests.clear(); dinos.resetUnlocked(); rebuild(); },
+  onClear: function(){ audio.unlock(); audio.playClick(); clearAll(); nests.clear(); dinos.resetUnlocked(); rebuild(); },
   onToggleVeg: function(on){ audio.unlock(); audio.playClick(); showVeg = on; rebuild(); },
   onToggleSun: function(on){
     audio.unlock(); audio.playClick();
@@ -201,12 +201,17 @@ function edit(px, py, d){
   audio.unlock();
   if (dug){
     audio.playDig();
-    if (c.fossilStage === 0 && Math.random() < FOSSIL_CHANCE){
+    if (c.fossilStage === 0 && dinos.hasLockedSpecies() && Math.random() < FOSSIL_CHANCE){
       c.fossilStage = 1; // achou — ainda são só alguns ossos
+      c.fossilSpecies = dinos.pickLockedSpecies(); // trava a espécie deste sítio agora
       audio.playFossil();
     } else if (c.fossilStage > 0 && c.fossilStage < FOSSIL_MAX_STAGE){
       c.fossilStage++; // cavando mais fundo no mesmo lugar, aparece mais fóssil
       audio.playFossil();
+      if (c.fossilStage === FOSSIL_MAX_STAGE){
+        const label = dinos.unlockSpecies(c.fossilSpecies);
+        if (label) hud.showDiscovery(label);
+      }
     }
   } else {
     audio.playRaise();

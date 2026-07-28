@@ -66,7 +66,7 @@ for (let q = -GRID_R; q <= GRID_R; q++){
   for (let r = r1; r <= r2; r++){
     cells.set(kcell(q,r), {
       q:q, r:r, h:0, seed:(q+512)*7919 + (r+512)*104729,
-      cor:null, mid:null, volcano:false, scorch:0, fossilStage:0, region:null,
+      cor:null, mid:null, volcano:false, scorch:0, fossilStage:0, fossilSpecies:null, region:null,
       caveDir:-1 // -1 = ainda não avaliado, -2 = avaliado e não rolou, 0-5 = tem caverna nessa direção
     });
   }
@@ -95,9 +95,12 @@ export function newIsland(){
     const d  = (Math.abs(c.q) + Math.abs(c.q+c.r) + Math.abs(c.r)) / 2;
     const n1 = hash(c.q + s, c.r - s);
     const n2 = hash(c.q*3 + 7 + s, c.r*3 - 5 - s);
-    c.h = Math.max(0, Math.min(MAXH, Math.round(4.4 - d*0.55 + (n1-0.5)*2.7 + (n2-0.5)*1.6)));
+    // base um pouco mais alta (era 4.4) — mais profundidade pra cavar,
+    // mais chance de bater num fóssil no caminho
+    c.h = Math.max(0, Math.min(MAXH, Math.round(4.8 - d*0.55 + (n1-0.5)*2.7 + (n2-0.5)*1.6)));
     c.region = null; // sem marca de Pangeia sobrevivendo numa ilha aleatória
     c.fossilStage = 0; // ilha nova, fósseis pra descobrir de novo
+    c.fossilSpecies = null;
     c.caveDir = -1;    // e paredões novos pra talvez esconder uma caverna
   });
 }
@@ -213,10 +216,11 @@ export function newPangea(){
     )));
     c.region = ownerDist > 0 ? REGIONS[ownerIdx].name : null; // pronta pro filtro de dinos por região, mais tarde
     c.fossilStage = 0;
+    c.fossilSpecies = null;
     c.caveDir = -1;
   });
 }
-export function clearAll(){ cells.forEach(function(c){ c.h = 0; c.region = null; c.fossilStage = 0; c.caveDir = -1; }); }
+export function clearAll(){ cells.forEach(function(c){ c.h = 0; c.region = null; c.fossilStage = 0; c.fossilSpecies = null; c.caveDir = -1; }); }
 
 export function cellAt(x, z){
   const qr = worldToHex(x, z);
