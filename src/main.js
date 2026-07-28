@@ -15,12 +15,21 @@ import { createHud } from './ui/hud.js';
 /* ═══════════════════════════════════════════════════════
    Cena
    ═══════════════════════════════════════════════════════ */
+// "Modo PC Jurássico": antialias e resolução só podem ser fixados na criação
+// do contexto WebGL, por isso a preferência fica salva e um toggle recarrega
+// a página em vez de tentar trocar isso em tempo real.
+const JURASSIC_KEY = 'ilhaDosDinos:pcJurassico';
+let pcJurassico = false;
+try { pcJurassico = localStorage.getItem(JURASSIC_KEY) === '1'; } catch (e) {}
+
 const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias:true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+const renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias: !pcJurassico });
+renderer.setPixelRatio(pcJurassico ? 1 : Math.min(window.devicePixelRatio || 1, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping; // contraste mais "cinematográfico", sem mexer nas cores dos materiais
+// contraste mais "cinematográfico" custa umas contas extras por pixel — no modo
+// jurássico isso some, sem mexer nas cores base dos materiais
+renderer.toneMapping = pcJurassico ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xdbe8f1);
@@ -93,7 +102,13 @@ const hud = createHud({
     audio.playClick(); // só toca se "on" for true — playClick já respeita o mudo
   },
   onToggleDig: function(on){ audio.unlock(); audio.playClick(); digMode = on; },
-  onToggleFullscreen: function(){ audio.unlock(); audio.playClick(); }
+  onToggleFullscreen: function(){ audio.unlock(); audio.playClick(); },
+  jurassic: pcJurassico,
+  onToggleJurassic: function(on){
+    audio.unlock(); audio.playClick();
+    try { localStorage.setItem(JURASSIC_KEY, on ? '1' : '0'); } catch (e) {}
+    location.reload();
+  }
 });
 
 let showVeg = true;

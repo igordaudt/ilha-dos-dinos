@@ -1,4 +1,4 @@
-export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen }){
+export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen, jurassic, onToggleJurassic }){
   const hud = document.getElementById('hud');
   const head = document.getElementById('head');
   head.addEventListener('click', function(){
@@ -25,6 +25,14 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
     const on = bSound.getAttribute('aria-pressed') !== 'true';
     bSound.setAttribute('aria-pressed', String(on));
     onToggleSound(on);
+  });
+
+  const bJur = document.getElementById('btn-jurassic');
+  bJur.setAttribute('aria-pressed', String(jurassic));
+  bJur.addEventListener('click', function(){
+    const on = bJur.getAttribute('aria-pressed') !== 'true';
+    bJur.setAttribute('aria-pressed', String(on));
+    onToggleJurassic(on); // troca antialias/resolução — só entra em vigor depois de recarregar
   });
 
   const bMode = document.getElementById('btn-mode');
