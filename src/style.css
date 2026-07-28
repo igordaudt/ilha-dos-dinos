@@ -32,6 +32,12 @@ button.act:active{ transform:translateY(1px); }
 button.act:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; }
 button.act[aria-pressed="false"]{ opacity:.45; }
 
+/* estado liga/desliga precisa ser óbvio de longe — cor forte, não só opacidade,
+   e o texto do botão já diz "ligado"/"desligado" (ver hud.js) */
+#btn-jurassic{ opacity:1 !important; }
+#btn-jurassic .state{ text-transform:uppercase; }
+#btn-jurassic[aria-pressed="true"]{ background:#c97b3d; color:#fff; border-color:#a8632e; }
+
 #stat{ position:fixed; right:12px; bottom:12px; z-index:10; background:var(--paper);
   border:2px solid var(--edge); border-radius:10px; padding:5px 10px; font-size:11.5px;
   opacity:.85; user-select:none; }

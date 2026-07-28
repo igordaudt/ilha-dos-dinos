@@ -28,11 +28,15 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
   });
 
   const bJur = document.getElementById('btn-jurassic');
-  bJur.setAttribute('aria-pressed', String(jurassic));
-  bJur.addEventListener('click', function(){
-    const on = bJur.getAttribute('aria-pressed') !== 'true';
+  const bJurState = bJur.querySelector('.state');
+  function paintJurassic(on){
     bJur.setAttribute('aria-pressed', String(on));
-    onToggleJurassic(on); // troca antialias/resolução — só entra em vigor depois de recarregar
+    bJurState.textContent = on ? 'ligado' : 'desligado';
+  }
+  paintJurassic(jurassic);
+  bJur.addEventListener('click', function(){
+    paintJurassic(bJur.getAttribute('aria-pressed') !== 'true');
+    onToggleJurassic(bJur.getAttribute('aria-pressed') === 'true'); // troca antialias/resolução — só entra em vigor depois de recarregar
   });
 
   const bMode = document.getElementById('btn-mode');
