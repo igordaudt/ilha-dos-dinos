@@ -1,12 +1,34 @@
 export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen, onToggleNight, shadowsOn, jurassic, onToggleJurassic, pangea, onTogglePangea }){
   const hud = document.getElementById('hud');
   const head = document.getElementById('head');
+  const mapMenu = document.getElementById('mapMenu');
+  const btnMap = document.getElementById('btn-map');
+  // só um dos dois fica aberto por vez — o menu de mapa fica bem embaixo do
+  // cabeçalho "Ilha dos Dinos", então os dois abertos ao mesmo tempo fariam
+  // o painel principal cobrir o botão do mapa
+  function closeMainPanel(){
+    hud.classList.remove('open');
+    head.setAttribute('aria-expanded', 'false');
+  }
+  function closeMapMenu(){
+    mapMenu.classList.remove('open');
+    btnMap.setAttribute('aria-expanded', 'false');
+  }
   head.addEventListener('click', function(){
     const open = hud.classList.toggle('open');
     head.setAttribute('aria-expanded', String(open));
+    if (open) closeMapMenu();
   });
-  document.getElementById('btn-new').addEventListener('click', onNewIsland);
+  btnMap.addEventListener('click', function(){
+    const open = mapMenu.classList.toggle('open');
+    btnMap.setAttribute('aria-expanded', String(open));
+    if (open) closeMainPanel();
+  });
   document.getElementById('btn-clear').addEventListener('click', onClear);
+  document.getElementById('btn-new').addEventListener('click', function(){
+    onNewIsland();
+    closeMapMenu();
+  });
 
   const bVeg = document.getElementById('btn-veg');
   bVeg.addEventListener('click', function(){
@@ -57,6 +79,7 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
   bPangea.addEventListener('click', function(){
     paintPangea(bPangea.getAttribute('aria-pressed') !== 'true');
     onTogglePangea(bPangea.getAttribute('aria-pressed') === 'true'); // muda o raio do mapa — só entra em vigor depois de recarregar
+    closeMapMenu();
   });
 
   const bMode = document.getElementById('btn-mode');
