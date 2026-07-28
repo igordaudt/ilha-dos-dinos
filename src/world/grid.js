@@ -66,7 +66,7 @@ for (let q = -GRID_R; q <= GRID_R; q++){
   for (let r = r1; r <= r2; r++){
     cells.set(kcell(q,r), {
       q:q, r:r, h:0, seed:(q+512)*7919 + (r+512)*104729,
-      cor:null, mid:null, volcano:false, scorch:0, fossilStage:0,
+      cor:null, mid:null, volcano:false, scorch:0, fossilStage:0, region:null,
       caveDir:-1 // -1 = ainda não avaliado, -2 = avaliado e não rolou, 0-5 = tem caverna nessa direção
     });
   }
@@ -96,21 +96,48 @@ export function newIsland(){
     const n1 = hash(c.q + s, c.r - s);
     const n2 = hash(c.q*3 + 7 + s, c.r*3 - 5 - s);
     c.h = Math.max(0, Math.min(MAXH, Math.round(4.4 - d*0.55 + (n1-0.5)*2.7 + (n2-0.5)*1.6)));
+    c.region = null; // sem marca de Pangeia sobrevivendo numa ilha aleatória
     c.fossilStage = 0; // ilha nova, fósseis pra descobrir de novo
     c.caveDir = -1;    // e paredões novos pra talvez esconder uma caverna
   });
 }
 
-// Contorno grosseiro da Pangeia (coordenadas normalizadas, ~-1..1), só a
-// silhueta reconhecível — o "C" com a baía do mar de Tétis mordendo o lado
-// leste. Não é geografia de verdade, é só pra ser divertido de reconhecer.
-const PANGEA_POLY = [
-  [ 0.05, -0.95], [ 0.32, -0.86], [ 0.50, -0.60],
-  [ 0.40, -0.28], [ 0.62, -0.10], [ 0.78,  0.12],
-  [ 0.52,  0.30], [ 0.28,  0.22], [ 0.16,  0.48],
-  [ 0.00,  0.80], [-0.30,  0.92], [-0.56,  0.66],
-  [-0.68,  0.30], [-0.54, -0.02], [-0.66, -0.36],
-  [-0.46, -0.70], [-0.20, -0.90]
+// Sete "regiões" grosseiras (coordenadas normalizadas, ~-1..1) que juntas
+// formam o contorno da Pangeia — o "C" com a baía do mar de Tétis mordendo
+// o lado leste, entre a Eurásia e a África/Índia. Não é geografia real, é
+// só pra dar uma ideia reconhecível de como era. As bordas entre regiões
+// que colidiram (América do Norte↔Eurásia, América do Sul↔África,
+// África↔Antártida, África↔Índia, Índia↔Austrália, Antártida↔Austrália)
+// ficam desenhadas propositalmente perto uma da outra — é essa proximidade
+// que gera a cordilheira, ver inflatePoly() abaixo. A borda entre Eurásia
+// e África/Índia fica bem mais afastada, pra manter o golfo de Tétis aberto.
+const REGIONS = [
+  { name:'northAmerica', poly:[
+    [-0.82,-0.90],[-0.45,-0.95],[-0.12,-0.80],[-0.08,-0.55],
+    [-0.14,-0.32],[-0.30,-0.16],[-0.55,-0.14],[-0.78,-0.30],[-0.88,-0.60]
+  ]},
+  { name:'eurasia', poly:[
+    [-0.12,-0.85],[0.20,-0.95],[0.55,-0.88],[0.80,-0.65],
+    [0.85,-0.35],[0.62,-0.32],[0.35,-0.30],[0.15,-0.40],[-0.02,-0.42],[-0.14,-0.62]
+  ]},
+  { name:'southAmerica', poly:[
+    [-0.80,-0.18],[-0.55,-0.15],[-0.32,0.02],[-0.24,0.28],
+    [-0.28,0.55],[-0.42,0.72],[-0.62,0.68],[-0.78,0.45],[-0.85,0.15]
+  ]},
+  { name:'africa', poly:[
+    [-0.24,0.10],[0.05,0.20],[0.28,0.28],[0.32,0.32],
+    [0.20,0.48],[-0.02,0.50],[-0.20,0.35],[-0.26,0.20]
+  ]},
+  { name:'india', poly:[
+    [0.28,0.28],[0.48,0.24],[0.58,0.22],[0.52,0.34],[0.36,0.34],[0.26,0.24]
+  ]},
+  { name:'antarctica', poly:[
+    [-0.42,0.48],[-0.10,0.44],[0.20,0.47],[0.38,0.58],
+    [0.28,0.80],[-0.02,0.92],[-0.30,0.86],[-0.48,0.68]
+  ]},
+  { name:'australia', poly:[
+    [0.32,0.38],[0.55,0.32],[0.76,0.42],[0.80,0.60],[0.64,0.72],[0.42,0.68],[0.28,0.55]
+  ]}
 ];
 function pointInPoly(x, z, poly){
   let inside = false;
@@ -128,31 +155,68 @@ function distToSeg(x, z, ax, az, bx, bz){
   t = t < 0 ? 0 : (t > 1 ? 1 : t);
   return Math.hypot(x - (ax+dx*t), z - (az+dz*t));
 }
-// distância (em unidades normalizadas) até a borda do contorno — positiva
-// dentro da Pangeia, negativa fora, igual em espírito ao "-d*0.55" que
+// distância (em unidades normalizadas) até a borda de UM polígono —
+// positiva dentro dele, negativa fora, igual em espírito ao "-d*0.55" que
 // newIsland() usa com a distância radial do centro
-function pangeaSignedDist(x, z){
+function regionSignedDist(x, z, poly){
   let d = Infinity;
-  for (let i = 0, j = PANGEA_POLY.length - 1; i < PANGEA_POLY.length; j = i++){
-    d = Math.min(d, distToSeg(x, z, PANGEA_POLY[j][0], PANGEA_POLY[j][1], PANGEA_POLY[i][0], PANGEA_POLY[i][1]));
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++){
+    d = Math.min(d, distToSeg(x, z, poly[j][0], poly[j][1], poly[i][0], poly[i][1]));
   }
-  return pointInPoly(x, z, PANGEA_POLY) ? d : -d;
+  return pointInPoly(x, z, poly) ? d : -d;
 }
+// versão "inflada" de cada região, escalada pra fora a partir do próprio
+// centro — onde a versão inflada de duas regiões vizinhas se sobrepõe é
+// onde nasce a cordilheira (ver newPangea()). Calculada uma vez só, na
+// carga do módulo, porque os polígonos são constantes.
+const INFLATE_K = 0.18;
+function inflatePoly(poly, k){
+  let cx = 0, cz = 0;
+  poly.forEach(function(p){ cx += p[0]; cz += p[1]; });
+  cx /= poly.length; cz /= poly.length;
+  return poly.map(function(p){ return [cx + (p[0]-cx)*(1+k), cz + (p[1]-cz)*(1+k)]; });
+}
+REGIONS.forEach(function(reg){ reg.inflated = inflatePoly(reg.poly, INFLATE_K); });
+
+// sobreposições incidentais (costas não-relacionadas se tocando de raspão)
+// ficam bem menores que sobreposições de verdade (regiões desenhadas perto
+// de propósito) — esse limiar separa uma coisa da outra
+const RIDGE_MIN = 0.018;
 
 export function newPangea(){
   const s = Math.floor(Math.random()*997);
   const R = GRID_R * SQ3 * SIZE; // raio físico do mapa, pra normalizar as coordenadas
   cells.forEach(function(c){
     const x = cxOf(c.q, c.r) / R, z = czOf(c.q, c.r) / R;
-    const edge = pangeaSignedDist(x, z) * GRID_R; // ~quantos hexágonos até a beira
+
+    let ownerIdx = -1, ownerDist = -Infinity;
+    let d1 = -Infinity, d2 = -Infinity; // as duas maiores distâncias infladas
+    for (let i = 0; i < REGIONS.length; i++){
+      const db = regionSignedDist(x, z, REGIONS[i].poly);
+      if (db > ownerDist){ ownerDist = db; ownerIdx = i; }
+      const di = regionSignedDist(x, z, REGIONS[i].inflated);
+      if (di > d1){ d2 = d1; d1 = di; } else if (di > d2){ d2 = di; }
+    }
+    const ridgeStrength = Math.max(0, Math.min(d1, d2) - RIDGE_MIN);
+
+    const edge = ownerDist * GRID_R;       // ~quantos hexágonos até a beira da região dona
+    const ridgeHex = ridgeStrength * GRID_R;
+    // a cordilheira só entra em terra que já é "de verdade" (perto o
+    // bastante da sua própria região) — sem isso, a sobreposição inflada
+    // de duas regiões distantes podia criar uma ponte de terra artificial
+    // atravessando um golfo que devia continuar aberto
+    const ridgeBoost = ownerDist > -0.15 ? Math.min(3.5, ridgeHex * 1.3) : 0;
     const n1 = hash(c.q + s, c.r - s);
     const n2 = hash(c.q*3 + 7 + s, c.r*3 - 5 - s);
-    c.h = Math.max(0, Math.min(MAXH, Math.round(2.6 + edge*0.85 + (n1-0.5)*2.6 + (n2-0.5)*1.5)));
+    c.h = Math.max(0, Math.min(MAXH, Math.round(
+      2.6 + edge*1.3 + ridgeBoost + (n1-0.5)*2.6 + (n2-0.5)*1.5
+    )));
+    c.region = ownerDist > 0 ? REGIONS[ownerIdx].name : null; // pronta pro filtro de dinos por região, mais tarde
     c.fossilStage = 0;
     c.caveDir = -1;
   });
 }
-export function clearAll(){ cells.forEach(function(c){ c.h = 0; c.fossilStage = 0; c.caveDir = -1; }); }
+export function clearAll(){ cells.forEach(function(c){ c.h = 0; c.region = null; c.fossilStage = 0; c.caveDir = -1; }); }
 
 export function cellAt(x, z){
   const qr = worldToHex(x, z);
