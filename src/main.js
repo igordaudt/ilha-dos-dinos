@@ -30,9 +30,11 @@ const renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias: !pcJurassic
 renderer.setPixelRatio(pcJurassico ? 1 : Math.min(window.devicePixelRatio || 1, 2));
 renderer.shadowMap.enabled = !pcJurassico; // sombra é o que mais pesa em tablet antigo — desliga por padrão no modo jurássico
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-// contraste mais "cinematográfico" custa umas contas extras por pixel — no modo
-// jurássico isso some, sem mexer nas cores base dos materiais
-renderer.toneMapping = pcJurassico ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+// ACES Filmic custava fill-rate extra e só deixava tudo mais claro/menos
+// saturado (as luzes daqui nunca foram calibradas pro fluxo HDR que o ACES
+// espera) — sem tone mapping a cor do material vai direto pra tela, mais
+// viva e mais barata, então nem precisa variar com o Modo PC Jurássico
+renderer.toneMapping = THREE.NoToneMapping;
 
 // mapa Pangeia tem raio maior — névoa, sombra e teto de zoom foram
 // calibrados pro mapa padrão (GRID_R=9) e precisam crescer junto, senão o
