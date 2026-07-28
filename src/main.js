@@ -223,7 +223,7 @@ function animate(ms){
 }
 
 newIsland();
-const dinos = createDinoSystem(scene, scatter, renderer, nests);
+const dinos = createDinoSystem(scene, scatter, renderer, nests, pcJurassico);
 rebuild();
 resize();
 applyCamera();

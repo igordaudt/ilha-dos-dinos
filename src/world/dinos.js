@@ -495,8 +495,13 @@ function stepDino(d, dt, time, scatter, allDinos, nests){
 /* ═══════════════════════════════════════════════════════
    Sistema
    ═══════════════════════════════════════════════════════ */
-export function createDinoSystem(scene, scatter, renderer, nests){
+export function createDinoSystem(scene, scatter, renderer, nests, lowEnd){
   const dinos = [];
+  // modo PC Jurássico: metade dos bichos por espécie (mínimo 1) — menos
+  // draw calls e menos animação procedural de perna por frame
+  function speciesCount(def){
+    return lowEnd ? Math.max(1, Math.ceil(def.count / 2)) : def.count;
+  }
 
   function spawnOne(def){
     const baseColor = jitterColor(def.color);
@@ -514,7 +519,7 @@ export function createDinoSystem(scene, scatter, renderer, nests){
     });
   }
   function spawnSpecies(def){
-    for (let i = 0; i < def.count; i++) spawnOne(def);
+    for (let i = 0; i < speciesCount(def); i++) spawnOne(def);
   }
   function removeSpecies(key){
     for (let i = dinos.length - 1; i >= 0; i--){
