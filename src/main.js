@@ -92,7 +92,8 @@ const hud = createHud({
     audio.setMuted(!on);
     audio.playClick(); // só toca se "on" for true — playClick já respeita o mudo
   },
-  onToggleDig: function(on){ audio.unlock(); audio.playClick(); digMode = on; }
+  onToggleDig: function(on){ audio.unlock(); audio.playClick(); digMode = on; },
+  onToggleFullscreen: function(){ audio.unlock(); audio.playClick(); }
 });
 
 let showVeg = true;

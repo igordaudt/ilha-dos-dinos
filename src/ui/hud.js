@@ -1,4 +1,4 @@
-export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig }){
+export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen }){
   const hud = document.getElementById('hud');
   const head = document.getElementById('head');
   head.addEventListener('click', function(){
@@ -35,6 +35,28 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
     bMode.querySelector('.txt').textContent = digging ? 'descer' : 'subir';
     onToggleDig(digging);
   });
+
+  const bFull = document.getElementById('btn-fullscreen');
+  const root = document.documentElement;
+  const requestFs = root.requestFullscreen || root.webkitRequestFullscreen;
+  if (!requestFs){
+    bFull.hidden = true; // API não suportada (ex.: iPhone Safari) — sem botão inútil na tela
+  } else {
+    bFull.addEventListener('click', function(){
+      onToggleFullscreen();
+      if (document.fullscreenElement || document.webkitFullscreenElement){
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        requestFs.call(root);
+      }
+    });
+    function syncFullscreenBtn(){
+      const on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      bFull.setAttribute('aria-pressed', String(on));
+    }
+    document.addEventListener('fullscreenchange', syncFullscreenBtn);
+    document.addEventListener('webkitfullscreenchange', syncFullscreenBtn);
+  }
 
   const elN = document.getElementById('n');
   const elP = document.getElementById('p');
