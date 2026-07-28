@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 
-export function createCameraControls({ canvas, camera, gridR, sq3, size, onTap, onHover }){
+export function createCameraControls({ canvas, camera, gridR, sq3, size, onTap, onHover, maxDist }){
   const cam = { theta: Math.PI*0.25, phi: 0.82, dist: 30, target: new THREE.Vector3(0,1,0) };
+  const distCap = maxDist || 64;
   function applyCamera(){
     cam.phi  = Math.max(0.16, Math.min(1.40, cam.phi));
-    cam.dist = Math.max(6, Math.min(64, cam.dist));
+    cam.dist = Math.max(6, Math.min(distCap, cam.dist));
     const s = Math.sin(cam.phi), y = Math.cos(cam.phi);
     camera.position.set(
       cam.target.x + cam.dist*s*Math.cos(cam.theta),

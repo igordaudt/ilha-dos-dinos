@@ -1,11 +1,20 @@
 // Grade hexagonal com cantos deslocados por ruído. O deslocamento é função
 // da posição ORIGINAL do canto, para que as 3 células vizinhas concordem.
 
+// "Mapa Pangeia": raio maior + geração com o contorno aproximado da Pangeia
+// em vez de aleatória. O tamanho do grid é decidido na carga do módulo (a
+// grade é montada logo abaixo), então a preferência fica salva e só entra
+// em vigor com reload — mesmo padrão do Modo PC Jurássico em main.js.
+const PANGEA_KEY = 'ilhaDosDinos:pangea';
+let pangeaModeOn = false;
+try { pangeaModeOn = localStorage.getItem(PANGEA_KEY) === '1'; } catch (e) {}
+export const PANGEA_MODE = pangeaModeOn;
+
 export const SQ3    = Math.sqrt(3);
 export const SIZE   = 1;
 export const STEP   = 0.5;
 export const MAXH   = 9;
-export const GRID_R = 9;
+export const GRID_R = pangeaModeOn ? 13 : 9;
 export const BOTTOM = -0.7;
 export const WATER_Y = 0.03;
 export const JITTER = 0.26;
@@ -89,6 +98,58 @@ export function newIsland(){
     c.h = Math.max(0, Math.min(MAXH, Math.round(4.4 - d*0.55 + (n1-0.5)*2.7 + (n2-0.5)*1.6)));
     c.fossilStage = 0; // ilha nova, fósseis pra descobrir de novo
     c.caveDir = -1;    // e paredões novos pra talvez esconder uma caverna
+  });
+}
+
+// Contorno grosseiro da Pangeia (coordenadas normalizadas, ~-1..1), só a
+// silhueta reconhecível — o "C" com a baía do mar de Tétis mordendo o lado
+// leste. Não é geografia de verdade, é só pra ser divertido de reconhecer.
+const PANGEA_POLY = [
+  [ 0.05, -0.95], [ 0.32, -0.86], [ 0.50, -0.60],
+  [ 0.40, -0.28], [ 0.62, -0.10], [ 0.78,  0.12],
+  [ 0.52,  0.30], [ 0.28,  0.22], [ 0.16,  0.48],
+  [ 0.00,  0.80], [-0.30,  0.92], [-0.56,  0.66],
+  [-0.68,  0.30], [-0.54, -0.02], [-0.66, -0.36],
+  [-0.46, -0.70], [-0.20, -0.90]
+];
+function pointInPoly(x, z, poly){
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++){
+    const xi = poly[i][0], zi = poly[i][1], xj = poly[j][0], zj = poly[j][1];
+    const hit = ((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi);
+    if (hit) inside = !inside;
+  }
+  return inside;
+}
+function distToSeg(x, z, ax, az, bx, bz){
+  const dx = bx-ax, dz = bz-az;
+  const len2 = dx*dx + dz*dz;
+  let t = len2 > 1e-9 ? ((x-ax)*dx + (z-az)*dz) / len2 : 0;
+  t = t < 0 ? 0 : (t > 1 ? 1 : t);
+  return Math.hypot(x - (ax+dx*t), z - (az+dz*t));
+}
+// distância (em unidades normalizadas) até a borda do contorno — positiva
+// dentro da Pangeia, negativa fora, igual em espírito ao "-d*0.55" que
+// newIsland() usa com a distância radial do centro
+function pangeaSignedDist(x, z){
+  let d = Infinity;
+  for (let i = 0, j = PANGEA_POLY.length - 1; i < PANGEA_POLY.length; j = i++){
+    d = Math.min(d, distToSeg(x, z, PANGEA_POLY[j][0], PANGEA_POLY[j][1], PANGEA_POLY[i][0], PANGEA_POLY[i][1]));
+  }
+  return pointInPoly(x, z, PANGEA_POLY) ? d : -d;
+}
+
+export function newPangea(){
+  const s = Math.floor(Math.random()*997);
+  const R = GRID_R * SQ3 * SIZE; // raio físico do mapa, pra normalizar as coordenadas
+  cells.forEach(function(c){
+    const x = cxOf(c.q, c.r) / R, z = czOf(c.q, c.r) / R;
+    const edge = pangeaSignedDist(x, z) * GRID_R; // ~quantos hexágonos até a beira
+    const n1 = hash(c.q + s, c.r - s);
+    const n2 = hash(c.q*3 + 7 + s, c.r*3 - 5 - s);
+    c.h = Math.max(0, Math.min(MAXH, Math.round(2.6 + edge*0.85 + (n1-0.5)*2.6 + (n2-0.5)*1.5)));
+    c.fossilStage = 0;
+    c.caveDir = -1;
   });
 }
 export function clearAll(){ cells.forEach(function(c){ c.h = 0; c.fossilStage = 0; c.caveDir = -1; }); }

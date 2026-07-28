@@ -38,6 +38,10 @@ button.act[aria-pressed="false"]{ opacity:.45; }
 #btn-jurassic .state{ text-transform:uppercase; }
 #btn-jurassic[aria-pressed="true"]{ background:#c97b3d; color:#fff; border-color:#a8632e; }
 
+#btn-pangea{ opacity:1 !important; }
+#btn-pangea .state{ text-transform:uppercase; }
+#btn-pangea[aria-pressed="true"]{ background:#6b5a3a; color:#fff; border-color:#544631; }
+
 #stat{ position:fixed; right:12px; bottom:12px; z-index:10; background:var(--paper);
   border:2px solid var(--edge); border-radius:10px; padding:5px 10px; font-size:11.5px;
   opacity:.85; user-select:none; }

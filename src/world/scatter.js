@@ -1,5 +1,11 @@
 import * as THREE from 'three';
-import { hash, clamp01 } from './grid.js';
+import { hash, clamp01, cells } from './grid.js';
+
+// os limites abaixo foram calibrados pro mapa padrão (271 células); em mapas
+// maiores (ex.: Pangeia) escalamos junto, senão a vegetação simplesmente
+// some perto das bordas quando o limite estoura, sem erro nem aviso
+const CAP_SCALE = cells.size / 271;
+function scaleCap(n){ return Math.ceil(n * CAP_SCALE); }
 
 // Vegetação e pedras em InstancedMesh, posições por PRNG semeado em (q,r)
 // para não teleportarem quando o terreno muda em outro lugar.
@@ -262,22 +268,22 @@ export function createScatterSystem(scene){
     return im;
   }
   const D = {
-    rockA  : makeIM(rockGeo([0.50,0.48,0.45]), 1400, true),
-    rockB  : makeIM(rockGeo([0.40,0.38,0.35]), 1000, true),
-    pebble : makeIM(rockGeo([0.80,0.74,0.60], 0.30), 900, false),
-    shell  : makeIM(rockGeo([0.93,0.88,0.80], 0.34), 300, false),
-    tall   : makeIM(tallTreeGeo(), 260, true),
-    conif  : makeIM(coniferGeo(),  700, true),
-    cycad  : makeIM(cycadGeo(),    500, true),
-    bush   : makeIM(bushGeo(),     900, true),
-    log    : makeIM(logGeo(),      220, true),
-    tuft   : makeIM(tuftGeo(),    2600, false),
-    flowerA: makeIM(flowerGeo([0.94,0.80,0.34]), 450, false),
-    flowerB: makeIM(flowerGeo([0.88,0.55,0.68]), 350, false),
-    fossil1: makeIM(fossilGeo1(), 40, false),
-    fossil2: makeIM(fossilGeo2(), 40, false),
-    fossil3: makeIM(fossilGeo3(), 24, false),
-    cave   : makeIM(caveGeo(), 20, false)
+    rockA  : makeIM(rockGeo([0.50,0.48,0.45]), scaleCap(1400), true),
+    rockB  : makeIM(rockGeo([0.40,0.38,0.35]), scaleCap(1000), true),
+    pebble : makeIM(rockGeo([0.80,0.74,0.60], 0.30), scaleCap(900), false),
+    shell  : makeIM(rockGeo([0.93,0.88,0.80], 0.34), scaleCap(300), false),
+    tall   : makeIM(tallTreeGeo(), scaleCap(260), true),
+    conif  : makeIM(coniferGeo(),  scaleCap(700), true),
+    cycad  : makeIM(cycadGeo(),    scaleCap(500), true),
+    bush   : makeIM(bushGeo(),     scaleCap(900), true),
+    log    : makeIM(logGeo(),      scaleCap(220), true),
+    tuft   : makeIM(tuftGeo(),    scaleCap(2600), false),
+    flowerA: makeIM(flowerGeo([0.94,0.80,0.34]), scaleCap(450), false),
+    flowerB: makeIM(flowerGeo([0.88,0.55,0.68]), scaleCap(350), false),
+    fossil1: makeIM(fossilGeo1(), scaleCap(40), false),
+    fossil2: makeIM(fossilGeo2(), scaleCap(40), false),
+    fossil3: makeIM(fossilGeo3(), scaleCap(24), false),
+    cave   : makeIM(caveGeo(), scaleCap(20), false)
   };
   const DKEYS = Object.keys(D);
   const N = {};

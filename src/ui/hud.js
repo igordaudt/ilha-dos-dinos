@@ -1,4 +1,4 @@
-export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen, onToggleNight, shadowsOn, jurassic, onToggleJurassic }){
+export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen, onToggleNight, shadowsOn, jurassic, onToggleJurassic, pangea, onTogglePangea }){
   const hud = document.getElementById('hud');
   const head = document.getElementById('head');
   head.addEventListener('click', function(){
@@ -45,6 +45,18 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
   bJur.addEventListener('click', function(){
     paintJurassic(bJur.getAttribute('aria-pressed') !== 'true');
     onToggleJurassic(bJur.getAttribute('aria-pressed') === 'true'); // troca antialias/resolução — só entra em vigor depois de recarregar
+  });
+
+  const bPangea = document.getElementById('btn-pangea');
+  const bPangeaState = bPangea.querySelector('.state');
+  function paintPangea(on){
+    bPangea.setAttribute('aria-pressed', String(on));
+    bPangeaState.textContent = on ? 'ligado' : 'desligado';
+  }
+  paintPangea(pangea);
+  bPangea.addEventListener('click', function(){
+    paintPangea(bPangea.getAttribute('aria-pressed') !== 'true');
+    onTogglePangea(bPangea.getAttribute('aria-pressed') === 'true'); // muda o raio do mapa — só entra em vigor depois de recarregar
   });
 
   const bMode = document.getElementById('btn-mode');

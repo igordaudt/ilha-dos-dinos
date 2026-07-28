@@ -1,6 +1,6 @@
 import './style.css';
 import * as THREE from 'three';
-import { cells, kcell, GRID_R, SQ3, SIZE, MAXH, BOTTOM, WATER_Y, worldToHex, newIsland, clearAll } from './world/grid.js';
+import { cells, kcell, GRID_R, SQ3, SIZE, MAXH, BOTTOM, WATER_Y, worldToHex, newIsland, newPangea, clearAll, PANGEA_MODE } from './world/grid.js';
 import { createMeshSystem } from './world/mesh.js';
 import { createScatterSystem } from './world/scatter.js';
 import { createVolcanoSystem } from './world/volcano.js';
@@ -21,6 +21,9 @@ import { createHud } from './ui/hud.js';
 const JURASSIC_KEY = 'ilhaDosDinos:pcJurassico';
 let pcJurassico = false;
 try { pcJurassico = localStorage.getItem(JURASSIC_KEY) === '1'; } catch (e) {}
+// mesma chave que grid.js lê pra decidir GRID_R — duplicada aqui só porque
+// é o toggle (em main.js/hud.js) quem precisa gravar nela
+const PANGEA_KEY = 'ilhaDosDinos:pangea';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias: !pcJurassico });
@@ -31,9 +34,14 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 // jurássico isso some, sem mexer nas cores base dos materiais
 renderer.toneMapping = pcJurassico ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
 
+// mapa Pangeia tem raio maior — névoa, sombra e teto de zoom foram
+// calibrados pro mapa padrão (GRID_R=9) e precisam crescer junto, senão o
+// contorno maior fica encoberto antes de dar pra ver a ilha inteira
+const MAP_SCALE = GRID_R / 9;
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xdbe8f1);
-scene.fog = new THREE.Fog(0xdbe8f1, 30, 78);
+scene.fog = new THREE.Fog(0xdbe8f1, 30, 78 * MAP_SCALE);
 
 const camera = new THREE.PerspectiveCamera(38, 1, 0.5, 220);
 
@@ -43,9 +51,9 @@ const sun = new THREE.DirectionalLight(0xfff2da, 0.92); // vira "luar" à noite,
 sun.position.set(16, 24, 11);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -24; sun.shadow.camera.right = 24;
-sun.shadow.camera.top = 24;   sun.shadow.camera.bottom = -24;
-sun.shadow.camera.near = 4;   sun.shadow.camera.far = 74;
+sun.shadow.camera.left = -24 * MAP_SCALE; sun.shadow.camera.right = 24 * MAP_SCALE;
+sun.shadow.camera.top = 24 * MAP_SCALE;   sun.shadow.camera.bottom = -24 * MAP_SCALE;
+sun.shadow.camera.near = 4;   sun.shadow.camera.far = 74 * MAP_SCALE;
 sun.shadow.bias = -0.0014;
 scene.add(sun);
 scene.add(sun.target);
@@ -105,8 +113,10 @@ const mesh = createMeshSystem(scene, terrainMaterial.material, scatter, volcano)
 const nests = createNestSystem(scene);
 const audio = createAudioSystem();
 
+const generateIsland = PANGEA_MODE ? newPangea : newIsland;
+
 const hud = createHud({
-  onNewIsland: function(){ audio.unlock(); audio.playClick(); newIsland(); nests.clear(); rebuild(); },
+  onNewIsland: function(){ audio.unlock(); audio.playClick(); generateIsland(); nests.clear(); rebuild(); },
   onClear: function(){ audio.unlock(); audio.playClick(); clearAll(); nests.clear(); rebuild(); },
   onToggleVeg: function(on){ audio.unlock(); audio.playClick(); showVeg = on; rebuild(); },
   onToggleSun: function(on){
@@ -127,6 +137,12 @@ const hud = createHud({
   onToggleJurassic: function(on){
     audio.unlock(); audio.playClick();
     try { localStorage.setItem(JURASSIC_KEY, on ? '1' : '0'); } catch (e) {}
+    location.reload();
+  },
+  pangea: PANGEA_MODE,
+  onTogglePangea: function(on){
+    audio.unlock(); audio.playClick();
+    try { localStorage.setItem(PANGEA_KEY, on ? '1' : '0'); } catch (e) {}
     location.reload();
   }
 });
@@ -203,7 +219,7 @@ function edit(px, py, d){
    Câmera
    ═══════════════════════════════════════════════════════ */
 const { cam, applyCamera } = createCameraControls({
-  canvas: canvas, camera: camera, gridR: GRID_R, sq3: SQ3, size: SIZE,
+  canvas: canvas, camera: camera, gridR: GRID_R, sq3: SQ3, size: SIZE, maxDist: 64 * MAP_SCALE,
   onTap: function(px, py, d){ edit(px, py, digMode ? -1 : d); }, onHover: hover
 });
 
@@ -242,7 +258,7 @@ function animate(ms){
   requestAnimationFrame(animate);
 }
 
-newIsland();
+generateIsland();
 const dinos = createDinoSystem(scene, scatter, renderer, nests, pcJurassico);
 rebuild();
 resize();
