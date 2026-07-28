@@ -69,18 +69,65 @@ function evalPatch(P1,P2,P3, N1,N2,N3, A1,A2,A3){
   }
 }
 
+// Orçamento fixo de geometria por célula: toda célula ocupa sempre a mesma
+// fatia do buffer, tenha terreno ali ou não — o que muda de um rebuild pro
+// outro é só o CONTEÚDO da fatia, nunca seu tamanho ou posição. É isso que
+// permite reescrever só as células que mudaram em vez do mapa inteiro.
+const TRIS_PER_PATCH = TESS * TESS;             // triângulos por retalho PN — determinístico, não depende de dados
+const TRIS_PER_CELL  = 6*TRIS_PER_PATCH + 6*2;  // 6 retalhos + até 6 "saias" costeiras de 2 triângulos
+const VERTS_PER_CELL = TRIS_PER_CELL * 3;       // malha não-indexada, 3 vértices por triângulo
+
 export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
-  let terrain = null, faceCell = [];
+  // slot fixo por célula = ordem de inserção do Map (estável pra sempre,
+  // cells nunca é recriado em runtime)
+  let slotCount = 0;
+  cells.forEach(function(c){ c.slot = slotCount++; });
+  const CELL_COUNT = slotCount;
+
+  const capVerts = CELL_COUNT * VERTS_PER_CELL;
+  const posArr = new Float32Array(capVerts * 3);
+  const nrmArr = new Float32Array(capVerts * 3);
+  const colArr = new Float32Array(capVerts * 3);
+  const rkArr  = new Float32Array(capVerts);
+
+  const geometry = new THREE.BufferGeometry();
+  const posAttr = new THREE.BufferAttribute(posArr, 3).setUsage(THREE.DynamicDrawUsage);
+  const nrmAttr = new THREE.BufferAttribute(nrmArr, 3).setUsage(THREE.DynamicDrawUsage);
+  const colAttr = new THREE.BufferAttribute(colArr, 3).setUsage(THREE.DynamicDrawUsage);
+  const rkAttr  = new THREE.BufferAttribute(rkArr, 1).setUsage(THREE.DynamicDrawUsage);
+  geometry.setAttribute('position', posAttr);
+  geometry.setAttribute('normal', nrmAttr);
+  geometry.setAttribute('color', colAttr);
+  geometry.setAttribute('aRock', rkAttr);
+
+  const terrain = new THREE.Mesh(geometry, terrainMaterial);
+  terrain.castShadow = true;
+  terrain.receiveShadow = true;
+  // o buffer tem tamanho fixo e é mutado no lugar — nunca recalculamos a
+  // bounding sphere depois da primeira vez, então não confiamos nela pra culling
+  terrain.frustumCulled = false;
+  scene.add(terrain);
+
+  // triângulo → célula nunca muda (o layout de cada slot é fixo), então só
+  // precisa ser calculado uma vez, não a cada rebuild
+  const faceCell = new Array(CELL_COUNT * TRIS_PER_CELL);
+  cells.forEach(function(c){
+    const base = c.slot * TRIS_PER_CELL;
+    for (let t = 0; t < TRIS_PER_CELL; t++) faceCell[base + t] = c;
+  });
+
   const _c = [0,0,0];
-  let POS, COL, NRM, RKA;
+  let vi; // cursor de escrita (em vértices), local à célula sendo emitida
 
   function emitVert(g, topY){
-    POS.push(g.p[0], g.p[1], g.p[2]);
-    NRM.push(g.n[0], g.n[1], g.n[2]);
-    RKA.push(g.rk);
+    const o = vi*3;
+    posArr[o]=g.p[0]; posArr[o+1]=g.p[1]; posArr[o+2]=g.p[2];
+    nrmArr[o]=g.n[0]; nrmArr[o+1]=g.n[1]; nrmArr[o+2]=g.n[2];
+    rkArr[vi]=g.rk;
     terrainColor(g.p[0], g.p[1], g.p[2], g.rk, g.bc, g.sc, _c);
-    let ao = 1 - 0.30 * Math.min(1, Math.max(0, topY - g.p[1]) / 1.8);
-    COL.push(_c[0]*ao, _c[1]*ao, _c[2]*ao);
+    const ao = 1 - 0.30 * Math.min(1, Math.max(0, topY - g.p[1]) / 1.8);
+    colArr[o]=_c[0]*ao; colArr[o+1]=_c[1]*ao; colArr[o+2]=_c[2]*ao;
+    vi++;
   }
   function emitFlat(v0, v1, v2, rock, scorch, topY){
     const ax = v1[0]-v0[0], ay = v1[1]-v0[1], az = v1[2]-v0[2];
@@ -91,15 +138,92 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
     const vs = [v0, v1, v2];
     for (let k = 0; k < 3; k++){
       const v = vs[k];
-      POS.push(v[0], v[1], v[2]);
-      NRM.push(nx, ny, nz);
-      RKA.push(rock);
+      const o = vi*3;
+      posArr[o]=v[0]; posArr[o+1]=v[1]; posArr[o+2]=v[2];
+      nrmArr[o]=nx; nrmArr[o+1]=ny; nrmArr[o+2]=nz;
+      rkArr[vi]=rock;
       terrainColor(v[0], v[1], v[2], rock, 0, scorch, _c);
       let ao = 1 - 0.30 * Math.min(1, Math.max(0, topY - v[1]) / 1.8);
       if (v[1] <= BOTTOM + 0.001) ao *= 0.55;
-      COL.push(_c[0]*ao, _c[1]*ao, _c[2]*ao);
+      colArr[o]=_c[0]*ao; colArr[o+1]=_c[1]*ao; colArr[o+2]=_c[2]*ao;
+      vi++;
     }
   }
+  // triângulo de área zero: nunca aparece (nada pra rasterizar) e nunca
+  // registra hit de raycast (o produto vetorial das arestas fica zero, o
+  // three.js descarta a interseção nesse caso)
+  function emitDegenerate(p){
+    const o = vi*3;
+    posArr[o]=p[0]; posArr[o+1]=p[1]; posArr[o+2]=p[2];
+    nrmArr[o]=0; nrmArr[o+1]=1; nrmArr[o+2]=0;
+    rkArr[vi]=0;
+    colArr[o]=0; colArr[o+1]=0; colArr[o+2]=0;
+    vi++;
+  }
+  function emitDegenerateTri(p){ emitDegenerate(p); emitDegenerate(p); emitDegenerate(p); }
+
+  function emitCellSlot(c){
+    vi = c.slot * VERTS_PER_CELL;
+    const anchor = c.cor[0].p; // ponto de colapso pros triângulos degenerados desta célula
+
+    if (!c.mid){
+      for (let t = 0; t < TRIS_PER_CELL; t++) emitDegenerateTri(anchor);
+      return;
+    }
+
+    const cor = c.mid, C = c.cor;
+    const A1 = [cor.rock, cor.beach, cor.scorch];
+    const topY = cor.topY;
+
+    // 6 retalhos — sempre exatamente TESS² triângulos cada, incondicional
+    // (a contagem só depende de TESS, nunca dos dados da célula)
+    for (let i = 0; i < 6; i++){
+      const B = C[(i+1)%6], Dd = C[i];
+      evalPatch(cor.p, B.p, Dd.p, cor.n, B.d.n, Dd.d.n,
+                A1, [B.d.rock, B.d.beach, B.d.scorch], [Dd.d.rock, Dd.d.beach, Dd.d.scorch]);
+      for (let a = 0; a < TESS; a++){
+        for (let b = 0; b < TESS - a; b++){
+          emitVert(G[a][b], topY); emitVert(G[a+1][b], topY); emitVert(G[a][b+1], topY);
+          if (a + b < TESS - 1){
+            emitVert(G[a+1][b], topY); emitVert(G[a+1][b+1], topY); emitVert(G[a][b+1], topY);
+          }
+        }
+      }
+    }
+
+    // 6 saias — 2 triângulos cada; reais se a direção toca água, senão degeneradas
+    for (let i = 0; i < 6; i++){
+      if (cor.waterMask & (1 << i)){
+        const a = C[i].p, b = C[(i+1)%6].p;
+        const aB = [a[0], BOTTOM, a[2]], bB = [b[0], BOTTOM, b[2]];
+        emitFlat(a, bB, aB, 1, cor.scorch, topY);
+        emitFlat(a, b,  bB, 1, cor.scorch, topY);
+      } else {
+        emitDegenerateTri(anchor);
+        emitDegenerateTri(anchor);
+      }
+    }
+  }
+
+  // ── diff: uma célula só entra na lista de "suja" se algo que sua
+  // geometria realmente usa mudou desde o rebuild anterior ──
+  function midChanged(prev, next){
+    if (!prev !== !next) return true; // água <-> terra
+    if (!prev) return false;
+    return prev.topY !== next.topY || prev.rock !== next.rock ||
+           prev.beach !== next.beach || prev.scorch !== next.scorch ||
+           prev.waterMask !== next.waterMask ||
+           prev.n[0] !== next.n[0] || prev.n[1] !== next.n[1] || prev.n[2] !== next.n[2];
+  }
+  function cornerChanged(prev, next){
+    if (!prev) return true;
+    return prev.y !== next.y || prev.rock !== next.rock || prev.beach !== next.beach ||
+           prev.scorch !== next.scorch ||
+           prev.n[0] !== next.n[0] || prev.n[1] !== next.n[1] || prev.n[2] !== next.n[2];
+  }
+
+  let prevCY = new Map();
+  let firstBuild = true;
 
   function rebuild(showVeg){
     /* vulcões */
@@ -159,21 +283,27 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
       for (let i = 0; i < 6; i++){
         const e = cornerAt(x0 + CORNER[i][0], z0 + CORNER[i][1]);
         const d = CY.get(e.k);
-        cor[i] = { p:[e.x, d.y, e.z], d:d };
+        cor[i] = { p:[e.x, d.y, e.z], d:d, k:e.k };
         mx += e.x; mz += e.z;
         if (d.y < lowest) lowest = d.y;
       }
       c.cor = cor;
       c.midXZ = [mx/6, mz/6];
       c.lowest = lowest;
+      c._prevMid = c.mid; // guardado pra comparar depois que as normais forem normalizadas
 
       if (c.h <= 0){ c.mid = null; return; }
 
-      let touchesWater = false;
+      // máscara de 6 bits (uma por direção) de quem toca água — não dá pra
+      // reaproveitar só a cor de praia aqui: ela satura em 0 pra células
+      // altas mesmo tocando água, e é a praia quem decide se a "saia"
+      // costeira aparece
+      let waterMask = 0;
       for (let i = 0; i < 6; i++){
         const nb = cells.get(kcell(c.q + DIRS[i][0], c.r + DIRS[i][1]));
-        if (!nb || nb.h === 0){ touchesWater = true; break; }
+        if (!nb || nb.h === 0) waterMask |= (1 << i);
       }
+      const touchesWater = waterMask !== 0;
       let topY = c.h*STEP + (hash(c.q*5.3, c.r*9.1) - 0.5)*0.09;
       if (c.volcano) topY = MAXH*STEP - 0.68;                    // cratera
       const drop = topY - lowest;
@@ -181,7 +311,7 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
         clamp01(smooth(0.34, 1.15, drop)*0.92 + smooth(3.1, 4.7, topY)*0.45);
       const beach = touchesWater ? smooth(2.6, 0.9, c.h) : 0;
       c.mid = { p:[mx/6, topY, mz/6], rock:rock, beach:beach, scorch:c.scorch,
-                n:[0,0,0], topY:topY, drop:drop, water:touchesWater };
+                n:[0,0,0], topY:topY, drop:drop, waterMask:waterMask };
 
       // normais grosseiras acumuladas por vértice compartilhado
       for (let i = 0; i < 6; i++){
@@ -201,41 +331,52 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
     CY.forEach(function(d){ fix(d.n); });
     cells.forEach(function(c){ if (c.mid) fix(c.mid.n); });
 
-    /* retalhos curvos, saias e espalhamento */
-    POS = []; COL = []; NRM = []; RKA = [];
-    faceCell = [];
-    scatter.beginBuild();
-
+    /* diff: só entram na lista quem realmente mudou — inclui em cascata
+       qualquer vizinho cujo canto compartilhado mudou (ex: vulcão se
+       formando/desfazendo, que muda a fuligem do vizinho do vizinho) sem
+       precisar calcular esse alcance na mão */
+    const dirty = [];
     cells.forEach(function(c){
-      if (!c.mid) return;
-      const cor = c.mid, C = c.cor;
-      const A1 = [cor.rock, cor.beach, cor.scorch];
-      const topY = cor.topY;
-
-      for (let i = 0; i < 6; i++){
-        const B = C[(i+1)%6], Dd = C[i];
-        evalPatch(cor.p, B.p, Dd.p, cor.n, B.d.n, Dd.d.n,
-                  A1, [B.d.rock, B.d.beach, B.d.scorch], [Dd.d.rock, Dd.d.beach, Dd.d.scorch]);
-        for (let a = 0; a < TESS; a++){
-          for (let b = 0; b < TESS - a; b++){
-            emitVert(G[a][b], topY); emitVert(G[a+1][b], topY); emitVert(G[a][b+1], topY);
-            faceCell.push(c);
-            if (a + b < TESS - 1){
-              emitVert(G[a+1][b], topY); emitVert(G[a+1][b+1], topY); emitVert(G[a][b+1], topY);
-              faceCell.push(c);
-            }
-          }
+      let changed = firstBuild || midChanged(c._prevMid, c.mid);
+      if (!changed){
+        for (let i = 0; i < 6; i++){
+          if (cornerChanged(prevCY.get(c.cor[i].k), c.cor[i].d)){ changed = true; break; }
         }
       }
+      if (changed) dirty.push(c);
+    });
+    firstBuild = false;
+    prevCY = CY;
 
-      for (let i = 0; i < 6; i++){
-        const nb = cells.get(kcell(c.q + DIRS[i][0], c.r + DIRS[i][1]));
-        if (nb && nb.h > 0) continue;
-        const a = C[i].p, b = C[(i+1)%6].p;
-        const aB = [a[0], BOTTOM, a[2]], bB = [b[0], BOTTOM, b[2]];
-        emitFlat(a, bB, aB, 1, cor.scorch, topY); faceCell.push(c);
-        emitFlat(a, b,  bB, 1, cor.scorch, topY); faceCell.push(c);
+    /* geometria: só as células sujas são reescritas no buffer fixo */
+    for (let i = 0; i < dirty.length; i++) emitCellSlot(dirty[i]);
+
+    if (dirty.length){
+      let minSlot = Infinity, maxSlot = -Infinity;
+      for (let i = 0; i < dirty.length; i++){
+        const s = dirty[i].slot;
+        if (s < minSlot) minSlot = s;
+        if (s > maxSlot) maxSlot = s;
       }
+      const vStart = minSlot * VERTS_PER_CELL;
+      const vCount = (maxSlot - minSlot + 1) * VERTS_PER_CELL;
+      posAttr.updateRange = { offset: vStart*3, count: vCount*3 };
+      nrmAttr.updateRange = { offset: vStart*3, count: vCount*3 };
+      colAttr.updateRange = { offset: vStart*3, count: vCount*3 };
+      rkAttr.updateRange  = { offset: vStart,   count: vCount };
+      posAttr.needsUpdate = true;
+      nrmAttr.needsUpdate = true;
+      colAttr.needsUpdate = true;
+      rkAttr.needsUpdate  = true;
+    }
+
+    /* espalhamento e vulcões: continuam em varredura completa — são
+       aritmética barata, sem a trigonometria pesada da tessellation acima,
+       então não valia o risco de também torná-los incrementais agora */
+    scatter.beginBuild();
+    cells.forEach(function(c){
+      if (!c.mid) return;
+      const cor = c.mid, C = c.cor, topY = cor.topY;
 
       if (c.volcano) volcano.addVolcano(cor.p[0], topY, cor.p[2]);
 
@@ -380,19 +521,6 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
 
     scatter.endBuild();
     volcano.endBuild();
-
-    if (terrain){ scene.remove(terrain); terrain.geometry.dispose(); terrain = null; }
-    if (POS.length){
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(POS, 3));
-      g.setAttribute('normal',   new THREE.Float32BufferAttribute(NRM, 3));
-      g.setAttribute('color',    new THREE.Float32BufferAttribute(COL, 3));
-      g.setAttribute('aRock',    new THREE.Float32BufferAttribute(RKA, 1));
-      terrain = new THREE.Mesh(g, terrainMaterial);
-      terrain.castShadow = true;
-      terrain.receiveShadow = true;
-      scene.add(terrain);
-    }
 
     let n = 0, peak = 0;
     cells.forEach(function(c){ if (c.h > 0){ n++; if (c.h > peak) peak = c.h; } });
