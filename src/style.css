@@ -70,7 +70,7 @@ button.act[aria-pressed="false"]{ opacity:.45; }
 
 /* termômetro/higrômetro/pressostato — só decoração e curiosidade sobre o
    clima do período, valores fixos, não são leituras de verdade */
-#weather{ position:fixed; right:12px; top:50%; transform:translateY(-50%); z-index:10;
+#weather{ position:fixed; right:12px; bottom:54px; z-index:10;
   display:flex; flex-direction:column; align-items:flex-end; gap:6px; user-select:none; }
 #weather .lbl{ margin:0 2px 2px; font-size:9.5px; text-transform:uppercase;
   letter-spacing:.06em; opacity:.55; }
