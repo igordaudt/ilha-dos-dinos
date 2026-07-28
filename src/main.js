@@ -148,7 +148,7 @@ const hud = createHud({
 });
 
 let showVeg = true;
-let digMode = false; // touch não tem shift+clique nem botão direito, então o botão "descer" força o afundamento
+let digMode = true; // já começa ativo — o jeito mais fácil de topar com um fóssil é cavando
 function rebuild(){
   const stats = mesh.rebuild(showVeg);
   hud.setStats(stats);
@@ -210,7 +210,7 @@ function edit(px, py, d){
       audio.playFossil();
       if (c.fossilStage === FOSSIL_MAX_STAGE){
         const label = dinos.unlockSpecies(c.fossilSpecies);
-        if (label) hud.showDiscovery(label);
+        if (label) hud.showDiscovery(label, dinos.hasLockedSpecies());
       }
     }
   } else {
@@ -269,4 +269,5 @@ rebuild();
 resize();
 applyCamera();
 hud.removeBoot();
+hud.showModal('🦴 Escave para encontrar fósseis e liberar dinos!');
 requestAnimationFrame(animate);

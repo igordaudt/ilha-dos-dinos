@@ -87,7 +87,7 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
     const digging = bMode.getAttribute('aria-pressed') !== 'true';
     bMode.setAttribute('aria-pressed', String(digging));
     bMode.querySelector('.ico').textContent = digging ? '⛏️' : '⛰️';
-    bMode.querySelector('.txt').textContent = digging ? 'descer' : 'subir';
+    bMode.querySelector('.txt').textContent = digging ? 'escavar' : 'subir';
     onToggleDig(digging);
   });
 
@@ -127,14 +127,32 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
     if (boot) boot.remove();
   }
 
-  const elDiscovery = document.getElementById('discovery');
-  let discoveryTimer = null;
-  function showDiscovery(name){
-    if (discoveryTimer) clearTimeout(discoveryTimer);
-    elDiscovery.textContent = 'Parabéns, você descobriu o ' + name + '!';
-    elDiscovery.classList.add('show');
-    discoveryTimer = setTimeout(function(){ elDiscovery.classList.remove('show'); }, 4000);
+  // popup com "OK" pra garantir que a criança viu — usado tanto pro aviso
+  // inicial quanto pra descoberta de dino. Fila simples: se chegar uma
+  // mensagem nova enquanto outra ainda está na tela, ela só aparece depois
+  // que a atual for fechada, nenhuma se perde.
+  const elModal = document.getElementById('modal');
+  const elModalText = document.getElementById('modal-text');
+  const elModalOk = document.getElementById('modal-ok');
+  const modalQueue = [];
+  function showNextModal(){
+    if (!modalQueue.length){ elModal.classList.remove('show'); return; }
+    elModalText.textContent = modalQueue[0];
+    elModal.classList.add('show');
+  }
+  function showModal(text){
+    modalQueue.push(text);
+    if (modalQueue.length === 1) showNextModal();
+  }
+  elModalOk.addEventListener('click', function(){
+    modalQueue.shift();
+    showNextModal();
+  });
+  function showDiscovery(name, moreToFind){
+    let msg = '🦴 Parabéns! Você descobriu o ' + name + '!';
+    if (moreToFind) msg += ' Continue procurando outros dinos!';
+    showModal(msg);
   }
 
-  return { setStats, removeBoot, showDiscovery };
+  return { setStats, removeBoot, showModal, showDiscovery };
 }

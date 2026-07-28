@@ -14,9 +14,9 @@
   <button id="head" aria-expanded="false"><span>Ilha dos Dinos</span><span class="chev">▼</span></button>
   <div id="panel">
     <dl>
-      <dt>Clique</dt><dd>levanta a terra</dd>
-      <dt>Shift + clique / botão direito</dt><dd>afunda — no zero vira mar</dd>
-      <dt>Botão "descer" (canto inferior esquerdo)</dt><dd>no tablet, ative para afundar ao tocar</dd>
+      <dt>Botão "escavar" (canto inferior esquerdo)</dt><dd>já vem ativo — enquanto ativo, todo clique afunda</dd>
+      <dt>Clique (com "escavar" desativado)</dt><dd>levanta a terra</dd>
+      <dt>Shift + clique / botão direito (com "escavar" desativado)</dt><dd>afunda — no zero vira mar</dd>
       <dt>Arrastar / rolar</dt><dd>gira a câmera / aproxima</dd>
     </dl>
     <p class="tip">Sete hexágonos no nível máximo, um no centro e seis em volta, acendem um vulcão.</p>
@@ -44,7 +44,7 @@
   </div>
 </div>
 
-<button id="btn-mode" aria-pressed="false"><span class="ico">⛰️</span><span class="txt">subir</span></button>
+<button id="btn-mode" aria-pressed="true"><span class="ico">⛏️</span><span class="txt">escavar</span></button>
 
 <button id="btn-fullscreen" aria-pressed="false" title="Tela cheia">⛶</button>
 
@@ -63,9 +63,14 @@
   </div>
 </div>
 
-<div id="discovery" aria-live="polite"></div>
-
 <div id="stat">terra: <span id="n">0</span> · pico: <span id="p">0</span><span id="vc"></span></div>
+
+<div id="modal" aria-hidden="true">
+  <div id="modal-box">
+    <p id="modal-text"></p>
+    <button id="modal-ok">OK</button>
+  </div>
+</div>
 
 <canvas id="c"></canvas>
 
