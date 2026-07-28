@@ -25,7 +25,7 @@ try { pcJurassico = localStorage.getItem(JURASSIC_KEY) === '1'; } catch (e) {}
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias: !pcJurassico });
 renderer.setPixelRatio(pcJurassico ? 1 : Math.min(window.devicePixelRatio || 1, 2));
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !pcJurassico; // sombra é o que mais pesa em tablet antigo — desliga por padrão no modo jurássico
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 // contraste mais "cinematográfico" custa umas contas extras por pixel — no modo
 // jurássico isso some, sem mexer nas cores base dos materiais
@@ -80,7 +80,7 @@ scene.add(ring);
 /* ═══════════════════════════════════════════════════════
    Sistemas do mundo
    ═══════════════════════════════════════════════════════ */
-const terrainMaterial = createTerrainMaterial(renderer);
+const terrainMaterial = createTerrainMaterial(renderer, pcJurassico);
 const scatter = createScatterSystem(scene);
 const volcano = createVolcanoSystem(scene, lavaLight);
 const mesh = createMeshSystem(scene, terrainMaterial.material, scatter, volcano);
@@ -103,6 +103,7 @@ const hud = createHud({
   },
   onToggleDig: function(on){ audio.unlock(); audio.playClick(); digMode = on; },
   onToggleFullscreen: function(){ audio.unlock(); audio.playClick(); },
+  shadowsOn: !pcJurassico,
   jurassic: pcJurassico,
   onToggleJurassic: function(on){
     audio.unlock(); audio.playClick();

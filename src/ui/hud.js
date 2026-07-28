@@ -1,4 +1,4 @@
-export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen, jurassic, onToggleJurassic }){
+export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen, shadowsOn, jurassic, onToggleJurassic }){
   const hud = document.getElementById('hud');
   const head = document.getElementById('head');
   head.addEventListener('click', function(){
@@ -15,6 +15,7 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
     onToggleVeg(on);
   });
   const bSun = document.getElementById('btn-sun');
+  bSun.setAttribute('aria-pressed', String(shadowsOn)); // padrão muda no modo PC Jurássico
   bSun.addEventListener('click', function(){
     const on = bSun.getAttribute('aria-pressed') !== 'true';
     bSun.setAttribute('aria-pressed', String(on));

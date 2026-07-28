@@ -41,7 +41,10 @@ export function terrainColor(x, y, z, rock, beach, scorch, out){
 
 // Rocha: textura procedural em canvas, projetada triplanar via onBeforeCompile.
 // MeshPhongMaterial, não Lambert (Lambert não aceita flatShading).
-export function createTerrainMaterial(renderer){
+// lowEnd (modo PC Jurássico) tira a segunda leva de amostras (detalhe fino),
+// caindo de 6 pra 3 texture2D por fragmento — o fill-rate é o gargalo em
+// GPU de tablet antigo, e a rocha cobre a tela inteira.
+export function createTerrainMaterial(renderer, lowEnd){
   const rockTex = makeRockTexture(renderer, 256);
   let tShader = null;
 
@@ -83,8 +86,13 @@ export function createTerrainMaterial(renderer){
         'bn = pow(bn, vec3(4.0));',
         'bn /= max(bn.x + bn.y + bn.z, 0.0001);',
         'float t1 = texture2D(uTex, vWPos.zy*0.40).r*bn.x + texture2D(uTex, vWPos.xz*0.40).r*bn.y + texture2D(uTex, vWPos.xy*0.40).r*bn.z;',
+      ].concat(lowEnd ? [
+        'float t2 = t1;', // PC Jurássico: reaproveita a amostra grossa em vez de buscar detalhe fino
+        'float d = (t1 - 0.5)*0.74;',
+      ] : [
         'float t2 = texture2D(uTex, vWPos.zy*1.75).r*bn.x + texture2D(uTex, vWPos.xz*1.75).r*bn.y + texture2D(uTex, vWPos.xy*1.75).r*bn.z;',
         'float d = (t1 - 0.5)*0.74 + (t2 - 0.5)*0.40;',
+      ]).concat([
         'diffuseColor.rgb *= 1.0 + d * mix(0.20, 1.20, vRock);',
         'float strat = sin(vWPos.y*8.5 + t1*6.0)*0.5 + 0.5;',
         'diffuseColor.rgb *= 1.0 - (1.0 - bn.y) * vRock * strat * 0.16;',
@@ -97,7 +105,7 @@ export function createTerrainMaterial(renderer){
         'float foam = smoothstep(0.105, 0.015, abs(vWPos.y - wl))',
         '           * smoothstep(0.32, 0.52, t2 + wv*0.05) * bn.y;',
         'diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.96, 0.98, 0.99), foam*0.68);'
-      ].join('\n'));
+      ]).join('\n'));
   };
 
   return {
