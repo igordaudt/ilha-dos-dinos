@@ -66,7 +66,11 @@ for (let q = -GRID_R; q <= GRID_R; q++){
   for (let r = r1; r <= r2; r++){
     cells.set(kcell(q,r), {
       q:q, r:r, h:0, seed:(q+512)*7919 + (r+512)*104729,
-      cor:null, mid:null, volcano:false, scorch:0, fossilStage:0, fossilSpecies:null, region:null,
+      cor:null, mid:null,
+      volcanoTier:0, // 0 = não, 1 = vulcãozinho (trio), 2 = vulcãozão (flor de 7)
+      lava:0, bigPetal:false, // transientes, recalculados a cada rebuild — ver mesh.js
+      lavaFlowDir:-1, // sticky: só o vulcãozão tem, direção da pétala que escorre lava
+      scorch:0, fossilStage:0, fossilSpecies:null, region:null,
       caveDir:-1 // -1 = ainda não avaliado, -2 = avaliado e não rolou, 0-5 = tem caverna nessa direção
     });
   }
@@ -102,6 +106,7 @@ export function newIsland(){
     c.fossilStage = 0; // ilha nova, fósseis pra descobrir de novo
     c.fossilSpecies = null;
     c.caveDir = -1;    // e paredões novos pra talvez esconder uma caverna
+    c.lavaFlowDir = -1; // e nenhum vulcão antigo lembrado
   });
 }
 
@@ -218,9 +223,15 @@ export function newPangea(){
     c.fossilStage = 0;
     c.fossilSpecies = null;
     c.caveDir = -1;
+    c.lavaFlowDir = -1;
   });
 }
-export function clearAll(){ cells.forEach(function(c){ c.h = 0; c.region = null; c.fossilStage = 0; c.fossilSpecies = null; c.caveDir = -1; }); }
+export function clearAll(){
+  cells.forEach(function(c){
+    c.h = 0; c.region = null; c.fossilStage = 0; c.fossilSpecies = null;
+    c.caveDir = -1; c.lavaFlowDir = -1;
+  });
+}
 
 export function cellAt(x, z){
   const qr = worldToHex(x, z);

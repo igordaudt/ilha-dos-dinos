@@ -21,12 +21,14 @@ export function createVolcanoSystem(scene, lavaLight){
   const _E = new THREE.Euler(), _V = new THREE.Vector3(), _S = new THREE.Vector3();
 
   function beginBuild(){ volcanoes = []; }
-  function addVolcano(x, y, z){ volcanoes.push({ x:x, y:y, z:z }); }
+  // tier 1 = vulcãozinho (trio de 3 hexágonos), tier 2 = vulcãozão (flor de 7)
+  function addVolcano(x, y, z, tier){ volcanoes.push({ x:x, y:y, z:z, tier:tier || 1 }); }
   function endBuild(){
     while (lavaGroup.children.length) lavaGroup.remove(lavaGroup.children[0]);
     for (let i = 0; i < volcanoes.length; i++){
       const m = new THREE.Mesh(lavaGeo, lavaMat);
       m.position.set(volcanoes[i].x, volcanoes[i].y + 0.12, volcanoes[i].z);
+      m.scale.setScalar(volcanoes[i].tier === 2 ? 1 : 0.62); // vulcãozinho tem cratera menor
       lavaGroup.add(m);
     }
   }
@@ -43,7 +45,8 @@ export function createVolcanoSystem(scene, lavaLight){
     let n = 0;
     for (let v = 0; v < volcanoes.length && n < SMOKE_MAX; v++){
       const V = volcanoes[v];
-      for (let p = 0; p < PUFFS && n < SMOKE_MAX; p++){
+      const puffs = V.tier === 2 ? PUFFS : Math.ceil(PUFFS/2); // vulcãozinho fuma menos
+      for (let p = 0; p < puffs && n < SMOKE_MAX; p++){
         const ph = (time*0.15 + p/PUFFS + v*0.37) % 1;
         const s = Math.sin(ph*Math.PI) * (0.20 + ph*0.70);
         _E.set(p*1.3, ph*3.0, p*0.7);

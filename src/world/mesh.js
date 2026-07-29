@@ -31,7 +31,7 @@ function ctrlN(Pi, Pj, Ni, Nj){
 const G = [];
 for (let i = 0; i <= TESS; i++){
   G[i] = [];
-  for (let j = 0; j <= TESS - i; j++) G[i][j] = { p:[0,0,0], n:[0,0,0], rk:0, bc:0, sc:0 };
+  for (let j = 0; j <= TESS - i; j++) G[i][j] = { p:[0,0,0], n:[0,0,0], rk:0, bc:0, sc:0, lv:0 };
 }
 
 function evalPatch(P1,P2,P3, N1,N2,N3, A1,A2,A3){
@@ -65,6 +65,7 @@ function evalPatch(P1,P2,P3, N1,N2,N3, A1,A2,A3){
       g.rk = A1[0]*u + A2[0]*v + A3[0]*w;
       g.bc = A1[1]*u + A2[1]*v + A3[1]*w;
       g.sc = A1[2]*u + A2[2]*v + A3[2]*w;
+      g.lv = A1[3]*u + A2[3]*v + A3[3]*w;
     }
   }
 }
@@ -124,7 +125,7 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
     posArr[o]=g.p[0]; posArr[o+1]=g.p[1]; posArr[o+2]=g.p[2];
     nrmArr[o]=g.n[0]; nrmArr[o+1]=g.n[1]; nrmArr[o+2]=g.n[2];
     rkArr[vi]=g.rk;
-    terrainColor(g.p[0], g.p[1], g.p[2], g.rk, g.bc, g.sc, _c);
+    terrainColor(g.p[0], g.p[1], g.p[2], g.rk, g.bc, g.sc, g.lv, _c);
     const ao = 1 - 0.30 * Math.min(1, Math.max(0, topY - g.p[1]) / 1.8);
     colArr[o]=_c[0]*ao; colArr[o+1]=_c[1]*ao; colArr[o+2]=_c[2]*ao;
     vi++;
@@ -142,7 +143,7 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
       posArr[o]=v[0]; posArr[o+1]=v[1]; posArr[o+2]=v[2];
       nrmArr[o]=nx; nrmArr[o+1]=ny; nrmArr[o+2]=nz;
       rkArr[vi]=rock;
-      terrainColor(v[0], v[1], v[2], rock, 0, scorch, _c);
+      terrainColor(v[0], v[1], v[2], rock, 0, scorch, 0, _c);
       let ao = 1 - 0.30 * Math.min(1, Math.max(0, topY - v[1]) / 1.8);
       if (v[1] <= BOTTOM + 0.001) ao *= 0.55;
       colArr[o]=_c[0]*ao; colArr[o+1]=_c[1]*ao; colArr[o+2]=_c[2]*ao;
@@ -172,7 +173,7 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
     }
 
     const cor = c.mid, C = c.cor;
-    const A1 = [cor.rock, cor.beach, cor.scorch];
+    const A1 = [cor.rock, cor.beach, cor.scorch, cor.lava];
     const topY = cor.topY;
 
     // 6 retalhos — sempre exatamente TESS² triângulos cada, incondicional
@@ -180,7 +181,7 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
     for (let i = 0; i < 6; i++){
       const B = C[(i+1)%6], Dd = C[i];
       evalPatch(cor.p, B.p, Dd.p, cor.n, B.d.n, Dd.d.n,
-                A1, [B.d.rock, B.d.beach, B.d.scorch], [Dd.d.rock, Dd.d.beach, Dd.d.scorch]);
+                A1, [B.d.rock, B.d.beach, B.d.scorch, B.d.lava], [Dd.d.rock, Dd.d.beach, Dd.d.scorch, Dd.d.lava]);
       for (let a = 0; a < TESS; a++){
         for (let b = 0; b < TESS - a; b++){
           emitVert(G[a][b], topY); emitVert(G[a+1][b], topY); emitVert(G[a][b+1], topY);
@@ -212,13 +213,13 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
     if (!prev) return false;
     return prev.topY !== next.topY || prev.rock !== next.rock ||
            prev.beach !== next.beach || prev.scorch !== next.scorch ||
-           prev.waterMask !== next.waterMask ||
+           prev.lava !== next.lava || prev.waterMask !== next.waterMask ||
            prev.n[0] !== next.n[0] || prev.n[1] !== next.n[1] || prev.n[2] !== next.n[2];
   }
   function cornerChanged(prev, next){
     if (!prev) return true;
     return prev.y !== next.y || prev.rock !== next.rock || prev.beach !== next.beach ||
-           prev.scorch !== next.scorch ||
+           prev.scorch !== next.scorch || prev.lava !== next.lava ||
            prev.n[0] !== next.n[0] || prev.n[1] !== next.n[1] || prev.n[2] !== next.n[2];
   }
 
@@ -226,39 +227,65 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
   let firstBuild = true;
 
   function rebuild(showVeg){
-    /* vulcões */
+    /* vulcões — dois tamanhos: vulcãozão (flor de 7, checado primeiro,
+       reserva as 6 pétalas) e vulcãozinho (trio de 3 adjacentes entre si,
+       só entre quem sobrou fora de uma flor completa) */
     volcano.beginBuild();
+    cells.forEach(function(c){ c.volcanoTier = 0; c.lava = 0; c.bigPetal = false; });
+
     cells.forEach(function(c){
-      c.volcano = false;
       if (c.h !== MAXH) return;
-      let all = true;
+      const neighbors = [];
       for (let i = 0; i < 6; i++){
         const nb = cells.get(kcell(c.q + DIRS[i][0], c.r + DIRS[i][1]));
-        if (!nb || nb.h !== MAXH){ all = false; break; }
+        if (!nb || nb.h !== MAXH) return;
+        neighbors.push(nb);
       }
-      c.volcano = all;
+      c.volcanoTier = 2;
+      for (let i = 0; i < 6; i++) neighbors[i].bigPetal = true;
+      // uma das 6 pétalas "vaza" lava — sorteada uma vez, sticky (só re-sorteia
+      // se o vulcão se desfizer e se formar de novo depois)
+      if (c.lavaFlowDir === -1) c.lavaFlowDir = Math.floor(Math.random()*6);
+      const target = cells.get(kcell(c.q + DIRS[c.lavaFlowDir][0], c.r + DIRS[c.lavaFlowDir][1]));
+      if (target) target.lava = 1;
     });
     cells.forEach(function(c){
-      if (c.volcano){ c.scorch = 1; return; }
-      c.scorch = 0;
+      if (c.volcanoTier !== 2 && c.lavaFlowDir !== -1) c.lavaFlowDir = -1; // esqueceu, sorteia de novo na próxima
+    });
+    cells.forEach(function(c){
+      if (c.h !== MAXH || c.volcanoTier === 2 || c.bigPetal) return;
       for (let i = 0; i < 6; i++){
-        const nb = cells.get(kcell(c.q + DIRS[i][0], c.r + DIRS[i][1]));
-        if (nb && nb.volcano){ c.scorch = 0.55; break; }
+        const nbA = cells.get(kcell(c.q + DIRS[i][0], c.r + DIRS[i][1]));
+        const nbB = cells.get(kcell(c.q + DIRS[(i+1)%6][0], c.r + DIRS[(i+1)%6][1]));
+        if (nbA && nbA.h === MAXH && !nbA.bigPetal && nbB && nbB.h === MAXH && !nbB.bigPetal){
+          c.volcanoTier = 1;
+          break;
+        }
       }
     });
 
-    /* cantos: altura, rochosidade, praia, queimado */
+    cells.forEach(function(c){
+      if (c.volcanoTier > 0){ c.scorch = 1; return; }
+      c.scorch = 0;
+      for (let i = 0; i < 6; i++){
+        const nb = cells.get(kcell(c.q + DIRS[i][0], c.r + DIRS[i][1]));
+        if (nb && nb.volcanoTier > 0){ c.scorch = 0.55; break; }
+      }
+    });
+
+    /* cantos: altura, rochosidade, praia, queimado, lava */
     const info = new Map();
     cells.forEach(function(c){
       const x0 = cxOf(c.q,c.r), z0 = czOf(c.q,c.r);
       for (let i = 0; i < 6; i++){
         const e = cornerAt(x0 + CORNER[i][0], z0 + CORNER[i][1]);
         const it = info.get(e.k);
-        if (!it) info.set(e.k, { mn:c.h, mx:c.h, n:1, sc:c.scorch, x:e.x, z:e.z });
+        if (!it) info.set(e.k, { mn:c.h, mx:c.h, n:1, sc:c.scorch, lv:c.lava, x:e.x, z:e.z });
         else {
           if (c.h < it.mn) it.mn = c.h;
           if (c.h > it.mx) it.mx = c.h;
           if (c.scorch > it.sc) it.sc = c.scorch;
+          if (c.lava > it.lv) it.lv = c.lava;
           it.n++;
         }
       }
@@ -272,7 +299,7 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
       const wob = (hash(it.x*13.1, it.z*7.7) - 0.5) * (0.09 + rock*0.20);
       const beach = (mn === 0) ? smooth(2.6, 0.9, it.mx) : 0;
       CY.set(k, { y:(mn + (it.mx - mn)*steep)*STEP + wob,
-                  rock:rock, beach:beach, scorch:it.sc, n:[0,0,0] });
+                  rock:rock, beach:beach, scorch:it.sc, lava:it.lv, n:[0,0,0] });
     });
 
     /* malha grosseira e normais compartilhadas */
@@ -305,12 +332,12 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
       }
       const touchesWater = waterMask !== 0;
       let topY = c.h*STEP + (hash(c.q*5.3, c.r*9.1) - 0.5)*0.09;
-      if (c.volcano) topY = MAXH*STEP - 0.68;                    // cratera
+      if (c.volcanoTier > 0) topY = MAXH*STEP - 0.68;             // cratera
       const drop = topY - lowest;
-      const rock = c.volcano ? 1 :
+      const rock = c.volcanoTier > 0 ? 1 :
         clamp01(smooth(0.34, 1.15, drop)*0.92 + smooth(3.1, 4.7, topY)*0.45);
       const beach = touchesWater ? smooth(2.6, 0.9, c.h) : 0;
-      c.mid = { p:[mx/6, topY, mz/6], rock:rock, beach:beach, scorch:c.scorch,
+      c.mid = { p:[mx/6, topY, mz/6], rock:rock, beach:beach, scorch:c.scorch, lava:c.lava,
                 n:[0,0,0], topY:topY, drop:drop, waterMask:waterMask };
 
       // normais grosseiras acumuladas por vértice compartilhado
@@ -378,7 +405,7 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
       if (!c.mid) return;
       const cor = c.mid, C = c.cor, topY = cor.topY;
 
-      if (c.volcano) volcano.addVolcano(cor.p[0], topY, cor.p[2]);
+      if (c.volcanoTier > 0) volcano.addVolcano(cor.p[0], topY, cor.p[2], c.volcanoTier);
 
       /* ── espalhamento ── */
       const R = rng(c.seed);
@@ -413,7 +440,11 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
         if (nb){
           const a = C[c.caveDir].p, b = C[(c.caveDir+1)%6].p;
           const ex = (a[0]+b[0])/2, ez = (a[2]+b[2])/2;
-          const loY = nb.h*STEP, hiY = topY;
+          // altura real do paredão nessa aresta específica — não o pico desta
+          // célula (que fica bem mais alto que a própria aresta compartilhada
+          // com o vizinho baixo, o que fazia a caverna parecer flutuar acima
+          // do relevo em vez de embutida na parede)
+          const loY = nb.h*STEP, hiY = (a[1]+b[1])/2;
           const ey = loY + (hiY - loY)*0.35; // parte de baixo do paredão, não na crista
           const dx = cxOf(nb.q,nb.r) - cxOf(c.q,c.r), dz = czOf(nb.q,nb.r) - czOf(c.q,c.r);
           const ry = Math.atan2(-dz, dx); // vira a boca pra fora do paredão
@@ -421,7 +452,7 @@ export function createMeshSystem(scene, terrainMaterial, scatter, volcano){
           scatter.add('cave', ex, ey, ez, s, s, s, ry, 0);
         }
       }
-      if (c.volcano || c.scorch > 0.3){
+      if (c.volcanoTier > 0 || c.scorch > 0.3){
         for (let j = 0; j < 3; j++){
           if (R() > 0.5) continue;
           const s = 0.12 + R()*0.22;

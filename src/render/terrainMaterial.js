@@ -17,8 +17,9 @@ const STOPS = [
 const ROCK   = [0.520, 0.498, 0.458];
 const SAND   = [0.885, 0.815, 0.625];
 const BASALT = [0.175, 0.155, 0.150];
+const LAVA   = [0.97, 0.32, 0.06]; // pétala do vulcãozão "vazando" — ver mesh.js
 
-export function terrainColor(x, y, z, rock, beach, scorch, out){
+export function terrainColor(x, y, z, rock, beach, scorch, lava, out){
   let i = 0;
   while (i < STOPS.length - 2 && y > STOPS[i+1][0]) i++;
   const a = STOPS[i], b = STOPS[i+1];
@@ -33,6 +34,7 @@ export function terrainColor(x, y, z, rock, beach, scorch, out){
   const bf = beach * (1 - rock*0.7);
   r += (SAND[0]-r)*bf;    g += (SAND[1]-g)*bf;    l += (SAND[2]-l)*bf;
   r += (BASALT[0]-r)*scorch; g += (BASALT[1]-g)*scorch; l += (BASALT[2]-l)*scorch;
+  r += (LAVA[0]-r)*lava;  g += (LAVA[1]-g)*lava;  l += (LAVA[2]-l)*lava;
 
   const n = hash(x*2.3, z*2.9)*0.62 + hash(x*8.7 + 3, z*7.1 - 5)*0.38;
   const k = 0.92 + n*0.15;
