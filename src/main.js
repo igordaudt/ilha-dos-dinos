@@ -213,7 +213,7 @@ function showRing(c){
 }
 function hover(px, py){ showRing(pick(px, py)); }
 const FOSSIL_CHANCE = 0.12;  // chance de achar um fóssil ao cavar, só pra ser divertido
-const FOSSIL_MAX_STAGE = 3;  // no estágio 3 o fóssil aparece por completo
+const FOSSIL_MAX_STAGE = 3;  // no estágio 3 o fóssil aparece por completo — pulamos direto do 1 pro 3 (ver abaixo), só 2 cavadas ao todo
 function edit(px, py, d){
   const c = pick(px, py);
   if (!c) return;
@@ -229,12 +229,10 @@ function edit(px, py, d){
       c.fossilSpecies = dinos.pickLockedSpecies(); // trava a espécie deste sítio agora
       audio.playFossil();
     } else if (c.fossilStage > 0 && c.fossilStage < FOSSIL_MAX_STAGE){
-      c.fossilStage++; // cavando mais fundo no mesmo lugar, aparece mais fóssil
+      c.fossilStage = FOSSIL_MAX_STAGE; // segunda cavada já revela o fóssil completo
       audio.playFossil();
-      if (c.fossilStage === FOSSIL_MAX_STAGE){
-        const label = dinos.unlockSpecies(c.fossilSpecies);
-        if (label) hud.showDiscovery(label, dinos.hasLockedSpecies());
-      }
+      const label = dinos.unlockSpecies(c.fossilSpecies);
+      if (label) hud.showDiscovery(label, dinos.hasLockedSpecies());
     }
   } else {
     audio.playRaise();

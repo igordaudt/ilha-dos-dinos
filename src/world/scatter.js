@@ -116,9 +116,10 @@ function logGeo(){
   t.rotateZ(Math.PI/2); t.translate(0, 0.05, 0);
   return bake([{ geo:t, col:[0.36,0.29,0.22], jit:0.20 }]);
 }
-// fóssil, em três estágios de escavação — cavar mais um nível no mesmo
-// lugar revela mais osso, como se estivéssemos escavando de verdade.
-// Tom osso que não se confunde com pedra nem com madeira.
+// fóssil, em dois estágios de escavação (1 e 3 — o 3 vem logo depois do 1,
+// ver main.js) — cavar mais um nível no mesmo lugar revela o fóssil por
+// completo, como se estivéssemos escavando de verdade. Tom osso que não se
+// confunde com pedra nem com madeira.
 
 // estágio 1: "alguns ossos" — a descoberta, bem discreta
 function fossilGeo1(){
@@ -132,27 +133,6 @@ function fossilGeo1(){
   parts.push({ geo:shard, col:[0.82,0.78,0.68], jit:0.14 });
   return bake(parts);
 }
-// estágio 2: mais um pouco de escavação — costelas e o crânio aparecendo
-function fossilGeo2(){
-  const parts = [];
-  const rib1 = new THREE.TorusGeometry(0.16, 0.018, 5, 8, Math.PI*0.85);
-  rib1.rotateX(Math.PI/2); rib1.translate(0, 0.02, 0.02);
-  parts.push({ geo:rib1, col:[0.86,0.82,0.72], jit:0.12 });
-  const rib2 = new THREE.TorusGeometry(0.12, 0.015, 5, 7, Math.PI*0.8);
-  rib2.rotateX(Math.PI/2); rib2.translate(0.10, 0.015, -0.05);
-  parts.push({ geo:rib2, col:[0.84,0.80,0.70], jit:0.12 });
-  const skull = new THREE.IcosahedronGeometry(0.09, 0);
-  skull.scale(1.3, 0.7, 1.0);
-  skull.translate(-0.16, 0.03, 0.04);
-  parts.push({ geo:skull, col:[0.88,0.85,0.76], jit:0.10 });
-  const shard = new THREE.CylinderGeometry(0.015, 0.02, 0.22, 5);
-  shard.rotateZ(Math.PI*0.45);
-  shard.translate(0.02, 0.02, -0.14);
-  parts.push({ geo:shard, col:[0.82,0.78,0.68], jit:0.14 });
-  return bake(parts);
-}
-// estágio 3: esqueleto completo à mostra — caixa torácica dos dois lados,
-// coluna de vértebras, crânio e um osso de perna solto ao lado
 // estágio 3: esqueleto completo, desenhado como um estegossauro de propósito
 // — placas nas costas e os quatro espinhos na cauda (thagomizo) são as duas
 // marcas que dão pra reconhecer de cara qual dinossauro é, mesmo só de osso.
@@ -281,7 +261,6 @@ export function createScatterSystem(scene){
     flowerA: makeIM(flowerGeo([0.94,0.80,0.34]), scaleCap(450), false),
     flowerB: makeIM(flowerGeo([0.88,0.55,0.68]), scaleCap(350), false),
     fossil1: makeIM(fossilGeo1(), scaleCap(40), false),
-    fossil2: makeIM(fossilGeo2(), scaleCap(40), false),
     fossil3: makeIM(fossilGeo3(), scaleCap(24), false),
     cave   : makeIM(caveGeo(), scaleCap(20), false)
   };
