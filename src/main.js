@@ -11,6 +11,7 @@ import { createTerrainMaterial } from './render/terrainMaterial.js';
 import { createWaterMaterial } from './render/waterMaterial.js';
 import { makeDinoThumbnails } from './render/dinoThumbnails.js';
 import { makeVolcanoThumbnail } from './render/volcanoThumbnail.js';
+import { createFireworks } from './render/fireworks.js';
 import { createCameraControls } from './input/camera.js';
 import { createHud } from './ui/hud.js';
 
@@ -134,10 +135,12 @@ objectives.push({
   howTo: 'Levante sete hexágonos até o topo do mapa — um no centro e seis ao redor — para formar um vulcão com lava.'
 });
 
+const fireworks = createFireworks(document.getElementById('fireworks'));
+
 const hud = createHud({
   objectives: objectives,
-  onNewIsland: function(){ audio.unlock(); audio.playClick(); generateIsland(); nests.clear(); dinos.resetUnlocked(); rebuild(); },
-  onClear: function(){ audio.unlock(); audio.playClick(); clearAll(); nests.clear(); dinos.resetUnlocked(); rebuild(); },
+  onNewIsland: function(){ audio.unlock(); audio.playClick(); generateIsland(); nests.clear(); dinos.resetUnlocked(); allGoalsCelebrated = false; rebuild(); },
+  onClear: function(){ audio.unlock(); audio.playClick(); clearAll(); nests.clear(); dinos.resetUnlocked(); allGoalsCelebrated = false; rebuild(); },
   onToggleVeg: function(on){ audio.unlock(); audio.playClick(); showVeg = on; rebuild(); },
   onToggleSun: function(on){
     audio.unlock(); audio.playClick();
@@ -169,6 +172,7 @@ const hud = createHud({
 
 let showVeg = true;
 let digMode = true; // já começa ativo — o jeito mais fácil de topar com um fóssil é cavando
+let allGoalsCelebrated = false; // só comemora uma vez por mapa — reseta junto com dinos.resetUnlocked()
 function rebuild(){
   const stats = mesh.rebuild(showVeg);
   hud.setStats(stats);
@@ -177,6 +181,11 @@ function rebuild(){
   if (stats.volcanoCount > 0) discovered.push('vulcao');
   hud.updateDiscovered(discovered);
   audio.setVolcanoRumble(stats.volcanoCount > 0);
+  if (!allGoalsCelebrated && discovered.length === objectives.length){
+    allGoalsCelebrated = true;
+    fireworks.launch();
+    hud.showModal('🎉 Uau, você conseguiu! Encontrou todos os dinos e formou o vulcão — a Ilha dos Dinos está completa!');
+  }
 }
 
 /* ═══════════════════════════════════════════════════════
