@@ -10,6 +10,7 @@ import { createAudioSystem } from './audio/audio.js';
 import { createTerrainMaterial } from './render/terrainMaterial.js';
 import { createWaterMaterial } from './render/waterMaterial.js';
 import { makeDinoThumbnails } from './render/dinoThumbnails.js';
+import { makeVolcanoThumbnail } from './render/volcanoThumbnail.js';
 import { createCameraControls } from './input/camera.js';
 import { createHud } from './ui/hud.js';
 
@@ -122,9 +123,19 @@ const generateIsland = PANGEA_MODE ? newPangea : newIsland;
 // vez, num renderer descartável à parte (ver render/dinoThumbnails.js)
 const dinoThumbs = makeDinoThumbnails(renderer);
 
+// lista unificada dos cards de objetivo: um por dino + o vulcão (que não é
+// um bicho, mas segue o mesmo mecanismo de card — imagem + instrução +
+// selo verde quando a meta é atingida)
+const objectives = SPECIES.map(function(def){
+  return { key: def.key, label: def.label, img: dinoThumbs[def.key], howTo: def.howTo };
+});
+objectives.push({
+  key: 'vulcao', label: 'Vulcão', img: makeVolcanoThumbnail(),
+  howTo: 'Levante sete hexágonos até o topo do mapa — um no centro e seis ao redor — para formar um vulcão com lava.'
+});
+
 const hud = createHud({
-  species: SPECIES,
-  thumbnails: dinoThumbs,
+  objectives: objectives,
   onNewIsland: function(){ audio.unlock(); audio.playClick(); generateIsland(); nests.clear(); dinos.resetUnlocked(); rebuild(); },
   onClear: function(){ audio.unlock(); audio.playClick(); clearAll(); nests.clear(); dinos.resetUnlocked(); rebuild(); },
   onToggleVeg: function(on){ audio.unlock(); audio.playClick(); showVeg = on; rebuild(); },
@@ -162,7 +173,9 @@ function rebuild(){
   const stats = mesh.rebuild(showVeg);
   hud.setStats(stats);
   dinos.onTerrainChanged();
-  hud.updateDiscovered(dinos.getDiscovered());
+  const discovered = dinos.getDiscovered();
+  if (stats.volcanoCount > 0) discovered.push('vulcao');
+  hud.updateDiscovered(discovered);
   audio.setVolcanoRumble(stats.volcanoCount > 0);
 }
 
@@ -279,5 +292,6 @@ rebuild();
 resize();
 applyCamera();
 hud.removeBoot();
+hud.showModal('🎯 Estes são seus objetivos.', { point: true });
 hud.showModal('🦴 Escave para encontrar fósseis e liberar dinos!');
 requestAnimationFrame(animate);

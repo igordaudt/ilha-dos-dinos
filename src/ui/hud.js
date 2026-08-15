@@ -1,4 +1,4 @@
-export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen, onToggleNight, shadowsOn, jurassic, onToggleJurassic, pangea, onTogglePangea, species, thumbnails }){
+export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen, onToggleNight, shadowsOn, jurassic, onToggleJurassic, pangea, onTogglePangea, objectives }){
   const hud = document.getElementById('hud');
   const head = document.getElementById('head');
   const mapMenu = document.getElementById('mapMenu');
@@ -127,21 +127,33 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
     if (boot) boot.remove();
   }
 
-  // popup com "OK" pra garantir que a criança viu — usado tanto pro aviso
-  // inicial quanto pra descoberta de dino. Fila simples: se chegar uma
-  // mensagem nova enquanto outra ainda está na tela, ela só aparece depois
-  // que a atual for fechada, nenhuma se perde.
+  // popup com "OK" pra garantir que a criança viu — usado pro aviso
+  // inicial, descoberta de dino, e (com imagem) pro clique num card de
+  // objetivo. Fila simples: se chegar uma mensagem nova enquanto outra
+  // ainda está na tela, ela só aparece depois que a atual for fechada,
+  // nenhuma se perde.
   const elModal = document.getElementById('modal');
+  const elModalImg = document.getElementById('modal-img');
   const elModalText = document.getElementById('modal-text');
   const elModalOk = document.getElementById('modal-ok');
+  const elObjectives = document.getElementById('objectives');
   const modalQueue = [];
   function showNextModal(){
-    if (!modalQueue.length){ elModal.classList.remove('show'); return; }
-    elModalText.textContent = modalQueue[0];
+    if (!modalQueue.length){ elModal.classList.remove('show'); elObjectives.classList.remove('point'); return; }
+    const item = modalQueue[0];
+    elModalText.textContent = item.text;
+    if (item.img){ elModalImg.src = item.img; elModalImg.alt = item.alt || ''; elModalImg.hidden = false; }
+    else { elModalImg.hidden = true; elModalImg.src = ''; }
     elModal.classList.add('show');
+    elObjectives.classList.toggle('point', !!item.point);
   }
-  function showModal(text){
-    modalQueue.push(text);
+  // opts.img: mostra uma imagem maior acima do texto (cards de objetivo).
+  // opts.point: enquanto essa mensagem está na tela, os cards de objetivo
+  // ficam realçados por cima do fundo escurecido do popup — usado só na
+  // mensagem de boas-vindas, pra deixar claro que é deles que ela fala.
+  function showModal(text, opts){
+    opts = opts || {};
+    modalQueue.push({ text: text, img: opts.img, alt: opts.alt, point: !!opts.point });
     if (modalQueue.length === 1) showNextModal();
   }
   elModalOk.addEventListener('click', function(){
@@ -154,32 +166,41 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
     showModal(msg);
   }
 
-  // cards de objetivo — um por espécie, com a miniatura do modelo 3D de
-  // verdade (ver render/dinoThumbnails.js). Ganham um selo verde quando o
-  // dino correspondente é descoberto; o quadrado em si nunca muda, só o
-  // selo aparece/some, então dá pra ver de cara quais já foram achados.
-  const elObjectives = document.getElementById('objectives');
+  // cards de objetivo — um por dino (miniatura do modelo 3D de verdade) +
+  // o vulcão (ver render/dinoThumbnails.js e render/volcanoThumbnail.js).
+  // Ganham um selo verde quando a meta é atingida; o quadrado em si nunca
+  // muda, só o selo aparece/some, então dá pra ver de cara o que falta.
+  // Clicar em qualquer card (feito ou não) mostra a imagem maior e a
+  // instrução de como atingir aquela meta.
   const cardEls = {};
-  species.forEach(function(def){
-    const card = document.createElement('div');
+  objectives.forEach(function(o){
+    const card = document.createElement('button');
+    card.type = 'button';
     card.className = 'obj-card';
-    card.title = def.label;
+    card.title = o.label;
     const img = document.createElement('img');
-    img.src = (thumbnails && thumbnails[def.key]) || '';
-    img.alt = def.label;
+    img.src = o.img || '';
+    img.alt = o.label;
     card.appendChild(img);
     const check = document.createElement('span');
     check.className = 'obj-check';
     check.textContent = '✓';
     card.appendChild(check);
+    card.addEventListener('click', function(){
+      const done = card.classList.contains('done');
+      const text = done
+        ? '✅ ' + o.label + (o.key === 'vulcao' ? ' formado! Continue de olho na lava escorrendo.' : ' encontrado! Ele já vive na ilha.')
+        : '🔍 ' + o.label + ': ' + o.howTo;
+      showModal(text, { img: o.img, alt: o.label });
+    });
     elObjectives.appendChild(card);
-    cardEls[def.key] = card;
+    cardEls[o.key] = card;
   });
   function updateDiscovered(keys){
     const found = new Set(keys);
-    species.forEach(function(def){
-      const card = cardEls[def.key];
-      if (card) card.classList.toggle('done', found.has(def.key));
+    objectives.forEach(function(o){
+      const card = cardEls[o.key];
+      if (card) card.classList.toggle('done', found.has(o.key));
     });
   }
 

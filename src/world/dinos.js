@@ -15,25 +15,32 @@ import { createDinoMaterial } from '../render/dinoMaterial.js';
 // herd: true faz a espécie tender a ficar perto dos outros da mesma espécie
 // (ver pickWanderTarget) — só entra em jogo enquanto o bicho está vagando
 // à toa; procurando comida, ele se afasta da manada se precisar.
-// label: nome de exibição, usado só na mensagem de "descobriu um fóssil"
-// (ver createDinoSystem() mais abaixo) — o pterossauro não passa por
+// label: nome de exibição, usado tanto na mensagem de "descobriu um
+// fóssil" quanto no card de objetivo do HUD — o pterossauro não passa por
 // fóssil, mas ganha um label também pra manter a lista uniforme.
+// howTo: texto curto do popup do card de objetivo, explicando como achar
+// aquele dino (ver ui/hud.js).
 export const SPECIES = [
   { key:'braquiossauro', label:'Braquiossauro', bioma:'terrestre', food:'tall', count:2, herd:true,
     speedMin:0.35, speedMax:0.55, sizeMin:1.00, sizeMax:1.25,
-    color:[0.44, 0.53, 0.38] },
+    color:[0.44, 0.53, 0.38],
+    howTo:'Cave o chão em vários lugares até desenterrar o fóssil dele por completo.' },
   { key:'pequeno', label:'Compsognato', bioma:'terrestre', food:'bush', count:3,
     speedMin:1.10, speedMax:1.60, sizeMin:0.75, sizeMax:1.05,
-    color:[0.58, 0.45, 0.31] },
+    color:[0.58, 0.45, 0.31],
+    howTo:'Cave o chão em vários lugares até desenterrar o fóssil dele por completo.' },
   { key:'pterossauro', label:'Pterossauro', bioma:'voador', food:null, count:2,
     speedMin:1.40, speedMax:2.00, sizeMin:0.85, sizeMax:1.10,
-    color:[0.50, 0.52, 0.57] },
+    color:[0.50, 0.52, 0.57],
+    howTo:'Levante uma montanha bem alta — ele aparece voando e pousa nos picos mais altos.' },
   { key:'aquatico', label:'Plesiossauro', bioma:'aquatico', food:null, count:2,
     speedMin:0.80, speedMax:1.20, sizeMin:0.90, sizeMax:1.20,
-    color:[0.19, 0.40, 0.50] },
+    color:[0.19, 0.40, 0.50],
+    howTo:'Cave o chão em vários lugares até desenterrar o fóssil dele por completo.' },
   { key:'triceratopo', label:'Triceratopo', bioma:'terrestre', food:'cycad', count:2, herd:true,
     speedMin:0.55, speedMax:0.75, sizeMin:0.85, sizeMax:1.05,
-    color:[0.50, 0.46, 0.34] }
+    color:[0.50, 0.46, 0.34],
+    howTo:'Cave o chão em vários lugares até desenterrar o fóssil dele por completo.' }
 ];
 
 const WANDER_RADIUS      = 5;    // raio (m) do próximo ponto ao vagar
