@@ -1,4 +1,4 @@
-export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen, onToggleNight, shadowsOn, jurassic, onToggleJurassic, pangea, onTogglePangea }){
+export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen, onToggleNight, shadowsOn, jurassic, onToggleJurassic, pangea, onTogglePangea, species, thumbnails }){
   const hud = document.getElementById('hud');
   const head = document.getElementById('head');
   const mapMenu = document.getElementById('mapMenu');
@@ -154,5 +154,34 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
     showModal(msg);
   }
 
-  return { setStats, removeBoot, showModal, showDiscovery };
+  // cards de objetivo — um por espécie, com a miniatura do modelo 3D de
+  // verdade (ver render/dinoThumbnails.js). Ganham um selo verde quando o
+  // dino correspondente é descoberto; o quadrado em si nunca muda, só o
+  // selo aparece/some, então dá pra ver de cara quais já foram achados.
+  const elObjectives = document.getElementById('objectives');
+  const cardEls = {};
+  species.forEach(function(def){
+    const card = document.createElement('div');
+    card.className = 'obj-card';
+    card.title = def.label;
+    const img = document.createElement('img');
+    img.src = (thumbnails && thumbnails[def.key]) || '';
+    img.alt = def.label;
+    card.appendChild(img);
+    const check = document.createElement('span');
+    check.className = 'obj-check';
+    check.textContent = '✓';
+    card.appendChild(check);
+    elObjectives.appendChild(card);
+    cardEls[def.key] = card;
+  });
+  function updateDiscovered(keys){
+    const found = new Set(keys);
+    species.forEach(function(def){
+      const card = cardEls[def.key];
+      if (card) card.classList.toggle('done', found.has(def.key));
+    });
+  }
+
+  return { setStats, removeBoot, showModal, showDiscovery, updateDiscovered };
 }

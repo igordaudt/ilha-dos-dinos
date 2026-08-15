@@ -4,11 +4,12 @@ import { cells, kcell, GRID_R, SQ3, SIZE, MAXH, BOTTOM, WATER_Y, worldToHex, new
 import { createMeshSystem } from './world/mesh.js';
 import { createScatterSystem } from './world/scatter.js';
 import { createVolcanoSystem } from './world/volcano.js';
-import { createDinoSystem } from './world/dinos.js';
+import { createDinoSystem, SPECIES } from './world/dinos.js';
 import { createNestSystem } from './world/nests.js';
 import { createAudioSystem } from './audio/audio.js';
 import { createTerrainMaterial } from './render/terrainMaterial.js';
 import { createWaterMaterial } from './render/waterMaterial.js';
+import { makeDinoThumbnails } from './render/dinoThumbnails.js';
 import { createCameraControls } from './input/camera.js';
 import { createHud } from './ui/hud.js';
 
@@ -117,7 +118,13 @@ const audio = createAudioSystem();
 
 const generateIsland = PANGEA_MODE ? newPangea : newIsland;
 
+// miniaturas dos modelos 3D de verdade pros cards de objetivo — geradas uma
+// vez, num renderer descartável à parte (ver render/dinoThumbnails.js)
+const dinoThumbs = makeDinoThumbnails(renderer);
+
 const hud = createHud({
+  species: SPECIES,
+  thumbnails: dinoThumbs,
   onNewIsland: function(){ audio.unlock(); audio.playClick(); generateIsland(); nests.clear(); dinos.resetUnlocked(); rebuild(); },
   onClear: function(){ audio.unlock(); audio.playClick(); clearAll(); nests.clear(); dinos.resetUnlocked(); rebuild(); },
   onToggleVeg: function(on){ audio.unlock(); audio.playClick(); showVeg = on; rebuild(); },
@@ -155,6 +162,7 @@ function rebuild(){
   const stats = mesh.rebuild(showVeg);
   hud.setStats(stats);
   dinos.onTerrainChanged();
+  hud.updateDiscovered(dinos.getDiscovered());
   audio.setVolcanoRumble(stats.volcanoCount > 0);
 }
 

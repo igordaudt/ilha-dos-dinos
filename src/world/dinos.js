@@ -18,7 +18,7 @@ import { createDinoMaterial } from '../render/dinoMaterial.js';
 // label: nome de exibição, usado só na mensagem de "descobriu um fóssil"
 // (ver createDinoSystem() mais abaixo) — o pterossauro não passa por
 // fóssil, mas ganha um label também pra manter a lista uniforme.
-const SPECIES = [
+export const SPECIES = [
   { key:'braquiossauro', label:'Braquiossauro', bioma:'terrestre', food:'tall', count:2, herd:true,
     speedMin:0.35, speedMax:0.55, sizeMin:1.00, sizeMax:1.25,
     color:[0.44, 0.53, 0.38] },
@@ -48,7 +48,7 @@ const BOB_AMOUNT         = 0.10; // amplitude do balanço vertical (voo/nataçã
 const BOB_SPEED          = 1.6;
 const MAP_RADIUS         = GRID_R * SQ3 * SIZE; // mesmo limite do pan da câmera
 const COLOR_JITTER       = 0.30; // variação de cor entre indivíduos da mesma espécie
-const BELLY_LIGHTEN      = 0.45; // quanto a barriga clareia em relação ao dorso
+export const BELLY_LIGHTEN = 0.45; // quanto a barriga clareia em relação ao dorso
 const LEG_SWING_AMP      = 0.45; // rad — quanto a perna balança pra frente/trás
 const LEG_SWING_FREQ     = 6;    // cadência do passo, multiplicada pela velocidade do bicho
 const WING_FLAP_AMP      = 0.55; // rad — quanto a asa bate pra cima/baixo
@@ -65,7 +65,7 @@ const STATE = { WANDER:'vagar', SEEK:'procurarComida', EAT:'comer', IDLE:'ocioso
    Materiais — cada dino ganha um par dorso/barriga levemente
    sorteado, pra não sair uma leva de clones idênticos.
    ═══════════════════════════════════════════════════════ */
-function lighten(c, amt){
+export function lighten(c, amt){
   return [c[0] + (1-c[0])*amt, c[1] + (1-c[1])*amt, c[2] + (1-c[2])*amt];
 }
 function jitterColor(c){
@@ -295,7 +295,7 @@ function buildTriceratopo(mat, bellyMat){
   return { group: g, legs: legs, wings: [], tail: null };
 }
 
-const BUILDERS = {
+export const BUILDERS = {
   braquiossauro: buildBraquiossauro,
   pequeno: buildPequeno,
   pterossauro: buildPterossauro,
@@ -573,8 +573,16 @@ export function createDinoSystem(scene, scatter, renderer, nests, lowEnd){
     for (let i = 0; i < dinos.length; i++) stepDino(dinos[i], dt, time, scatter, dinos, nests);
   }
 
+  // chaves de todas as espécies visíveis agora — fósseis desenterrados +
+  // pterossauro se estiver voando. Usado pelos cards de objetivo no HUD.
+  function getDiscovered(){
+    const out = Array.from(unlocked);
+    if (flying) out.push('pterossauro');
+    return out;
+  }
+
   return {
     update, onTerrainChanged: syncFlyers,
-    hasLockedSpecies, pickLockedSpecies, unlockSpecies, resetUnlocked
+    hasLockedSpecies, pickLockedSpecies, unlockSpecies, resetUnlocked, getDiscovered
   };
 }
