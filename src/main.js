@@ -235,6 +235,11 @@ function showRing(c){
 function hover(px, py){ showRing(pick(px, py)); }
 const FOSSIL_CHANCE = 0.12;  // chance de achar um fóssil ao cavar, só pra ser divertido
 const FOSSIL_MAX_STAGE = 3;  // no estágio 3 o fóssil aparece por completo — pulamos direto do 1 pro 3 (ver abaixo), só 2 cavadas ao todo
+// um fóssil só pode começar num lugar onde ainda sobra pelo menos 1 nível de
+// terra depois da 1ª cavada (ou seja, altura ORIGINAL >= 2) — senão a 1ª
+// cavada já afunda a célula até virar mar, e a 2ª (que completa o fóssil)
+// fica impossível sem antes levantar a terra de novo, o que não é nada óbvio
+const FOSSIL_MIN_HEIGHT = 2;
 function edit(px, py, d){
   const c = pick(px, py);
   if (!c) return;
@@ -247,7 +252,7 @@ function edit(px, py, d){
   if (dug){
     if (prevH > 0 && h === 0) audio.playSplash(); // virou mar agora — som à parte, além do de cavar
     else audio.playDig();
-    if (c.fossilStage === 0 && dinos.hasLockedSpecies() && Math.random() < FOSSIL_CHANCE){
+    if (c.fossilStage === 0 && prevH >= FOSSIL_MIN_HEIGHT && dinos.hasLockedSpecies() && Math.random() < FOSSIL_CHANCE){
       c.fossilStage = 1; // achou — ainda são só alguns ossos
       c.fossilSpecies = dinos.pickLockedSpecies(); // trava a espécie deste sítio agora
       audio.playFossilFound();
