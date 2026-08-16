@@ -173,6 +173,8 @@ const hud = createHud({
 let showVeg = true;
 let digMode = true; // já começa ativo — o jeito mais fácil de topar com um fóssil é cavando
 let allGoalsCelebrated = false; // só comemora uma vez por mapa — reseta junto com dinos.resetUnlocked()
+let hadPterossauro = false; // toca o som de asas só na borda vazio→voando, não a cada rebuild()
+let hadVolcano = false;     // idem pro "boom" do vulcão — o ronco contínuo já é tratado à parte
 function rebuild(){
   const stats = mesh.rebuild(showVeg);
   hud.setStats(stats);
@@ -181,9 +183,19 @@ function rebuild(){
   if (stats.volcanoCount > 0) discovered.push('vulcao');
   hud.updateDiscovered(discovered);
   audio.setVolcanoRumble(stats.volcanoCount > 0);
+
+  const hasPterossauro = discovered.indexOf('pterossauro') !== -1;
+  if (hasPterossauro && !hadPterossauro) audio.playPterossauro();
+  hadPterossauro = hasPterossauro;
+
+  const hasVolcano = stats.volcanoCount > 0;
+  if (hasVolcano && !hadVolcano) audio.playVolcanoBoom();
+  hadVolcano = hasVolcano;
+
   if (!allGoalsCelebrated && discovered.length === objectives.length){
     allGoalsCelebrated = true;
     fireworks.launch();
+    audio.playCelebrate();
     hud.showModal('🎉 Uau, você conseguiu! Encontrou todos os dinos e formou o vulcão — a Ilha dos Dinos está completa!');
   }
 }
@@ -226,20 +238,22 @@ const FOSSIL_MAX_STAGE = 3;  // no estágio 3 o fóssil aparece por completo —
 function edit(px, py, d){
   const c = pick(px, py);
   if (!c) return;
+  const prevH = c.h;
   const h = Math.max(0, Math.min(MAXH, c.h + d));
   if (h === c.h) return;
   const dug = h < c.h;
   c.h = h;
   audio.unlock();
   if (dug){
-    audio.playDig();
+    if (prevH > 0 && h === 0) audio.playSplash(); // virou mar agora — som à parte, além do de cavar
+    else audio.playDig();
     if (c.fossilStage === 0 && dinos.hasLockedSpecies() && Math.random() < FOSSIL_CHANCE){
       c.fossilStage = 1; // achou — ainda são só alguns ossos
       c.fossilSpecies = dinos.pickLockedSpecies(); // trava a espécie deste sítio agora
-      audio.playFossil();
+      audio.playFossilFound();
     } else if (c.fossilStage > 0 && c.fossilStage < FOSSIL_MAX_STAGE){
       c.fossilStage = FOSSIL_MAX_STAGE; // segunda cavada já revela o fóssil completo
-      audio.playFossil();
+      audio.playFossilComplete();
       const label = dinos.unlockSpecies(c.fossilSpecies);
       if (label) hud.showDiscovery(label, dinos.hasLockedSpecies());
     }
