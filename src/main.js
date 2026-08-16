@@ -39,14 +39,17 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 // viva e mais barata, então nem precisa variar com o Modo PC Jurássico
 renderer.toneMapping = THREE.NoToneMapping;
 
-// mapa Pangeia tem raio maior — névoa, sombra e teto de zoom foram
-// calibrados pro mapa padrão (GRID_R=9) e precisam crescer junto, senão o
-// contorno maior fica encoberto antes de dar pra ver a ilha inteira
+// mapa Pangeia tem raio maior — sombra e teto de zoom foram calibrados
+// pro mapa padrão (GRID_R=9) e precisam crescer junto, senão o contorno
+// maior fica encoberto antes de dar pra ver a ilha inteira
 const MAP_SCALE = GRID_R / 9;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xdbe8f1);
-scene.fog = new THREE.Fog(0xdbe8f1, 30, 78 * MAP_SCALE);
+// sem névoa de cena — ela apagava o mapa inteiro assim que a câmera afastava
+// o suficiente pra enxergar a ilha completa. A borda da água já esconde sua
+// própria borda sozinha (escurece gradualmente até bem longe, ver
+// render/waterMaterial.js), então não faz falta.
 
 const camera = new THREE.PerspectiveCamera(38, 1, 0.5, 220);
 
@@ -72,7 +75,6 @@ let isNight = false;
 function applyDayNight(){
   const p = isNight ? NIGHT_SKY : DAY_SKY;
   scene.background.setHex(p.bg);
-  scene.fog.color.setHex(p.bg);
   hemi.color.setHex(p.hemiSky);
   hemi.groundColor.setHex(p.hemiGround);
   hemi.intensity = p.hemiI;
