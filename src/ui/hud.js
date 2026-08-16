@@ -1,4 +1,4 @@
-export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleSound, onToggleDig, onToggleFullscreen, onToggleNight, shadowsOn, jurassic, onToggleJurassic, pangea, onTogglePangea, objectives }){
+export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onToggleDig, onToggleFullscreen, onToggleNight, shadowsOn, jurassic, onToggleJurassic, pangea, onTogglePangea, objectives, volumePrefs, onMusicVolume, onSfxVolume, onMusicMuted, onSfxMuted }){
   const hud = document.getElementById('hud');
   const head = document.getElementById('head');
   const mapMenu = document.getElementById('mapMenu');
@@ -43,19 +43,41 @@ export function createHud({ onNewIsland, onClear, onToggleVeg, onToggleSun, onTo
     bSun.setAttribute('aria-pressed', String(on));
     onToggleSun(on);
   });
-  const bSound = document.getElementById('btn-sound');
-  bSound.addEventListener('click', function(){
-    const on = bSound.getAttribute('aria-pressed') !== 'true';
-    bSound.setAttribute('aria-pressed', String(on));
-    onToggleSound(on);
-  });
-
   const bNight = document.getElementById('btn-night');
   bNight.addEventListener('click', function(){
     const on = bNight.getAttribute('aria-pressed') !== 'true';
     bNight.setAttribute('aria-pressed', String(on));
     onToggleNight(on);
   });
+
+  // volume — mesmo padrão de "botão abre painel" do menu de mapa, só que do
+  // lado direito. Dois controles iguais (música/sons), cada um com seu
+  // deslizante e seu próprio botão de mudo — refletem o que já estava salvo
+  // (ver audio.js) assim que o painel é montado, antes de qualquer clique.
+  const volumeMenu = document.getElementById('volumeMenu');
+  const btnVolume = document.getElementById('btn-volume');
+  btnVolume.addEventListener('click', function(){
+    const open = volumeMenu.classList.toggle('open');
+    btnVolume.setAttribute('aria-expanded', String(open));
+  });
+  function paintMute(btn, muted){
+    btn.setAttribute('aria-pressed', String(muted));
+    btn.textContent = muted ? '🔇' : '🔊';
+  }
+  function wireVolume(sliderId, muteBtnId, initialVolume, initialMuted, onVolume, onMuted){
+    const slider = document.getElementById(sliderId);
+    const muteBtn = document.getElementById(muteBtnId);
+    slider.value = String(Math.round(initialVolume*100));
+    paintMute(muteBtn, initialMuted);
+    slider.addEventListener('input', function(){ onVolume(Number(slider.value)/100); });
+    muteBtn.addEventListener('click', function(){
+      const muted = muteBtn.getAttribute('aria-pressed') !== 'true';
+      paintMute(muteBtn, muted);
+      onMuted(muted);
+    });
+  }
+  wireVolume('vol-music', 'btn-mute-music', volumePrefs.musicVolume, volumePrefs.musicMuted, onMusicVolume, onMusicMuted);
+  wireVolume('vol-sfx', 'btn-mute-sfx', volumePrefs.sfxVolume, volumePrefs.sfxMuted, onSfxVolume, onSfxMuted);
 
   const bJur = document.getElementById('btn-jurassic');
   const bJurState = bJur.querySelector('.state');

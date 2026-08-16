@@ -147,11 +147,11 @@ const hud = createHud({
     renderer.shadowMap.enabled = on;
     scene.traverse(function(o){ if (o.material) o.material.needsUpdate = true; });
   },
-  onToggleSound: function(on){
-    audio.unlock();
-    audio.setMuted(!on);
-    audio.playClick(); // só toca se "on" for true — playClick já respeita o mudo
-  },
+  volumePrefs: audio.getVolumePrefs(),
+  onMusicVolume: function(v){ audio.unlock(); audio.setMusicVolume(v); },
+  onSfxVolume: function(v){ audio.unlock(); audio.setSfxVolume(v); },
+  onMusicMuted: function(m){ audio.unlock(); audio.setMusicMuted(m); },
+  onSfxMuted: function(m){ audio.unlock(); audio.setSfxMuted(m); },
   onToggleDig: function(on){ audio.unlock(); audio.playClick(); digMode = on; },
   onToggleFullscreen: function(){ audio.unlock(); audio.playClick(); },
   onToggleNight: function(on){ audio.unlock(); audio.playClick(); isNight = on; applyDayNight(); },

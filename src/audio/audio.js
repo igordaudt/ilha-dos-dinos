@@ -7,6 +7,12 @@
 // qualquer som por um de verdade só de colocar o arquivo na pasta, sem mexer
 // em código nenhum.
 //
+// Dois barramentos independentes — sfxGain (tudo abaixo, cliques/cavar/
+// fósseis/vulcão/etc.) e musicGain (só a trilha de fundo) — cada um com seu
+// próprio volume e mudo, controlados pelo widget de volume no HUD (ver
+// ui/hud.js). A preferência do jogador fica salva no localStorage, pra não
+// precisar reajustar toda vez que recarregar a página.
+//
 // Nomes esperados em public/sfx/ (efeitos curtos, decodificados por inteiro
 // na memória pra tocar sem atraso e poder sobrepor instâncias):
 //   click.mp3            clique de botão/menu genérico
@@ -25,8 +31,9 @@
 // O contexto (e o carregamento de tudo isso) só pode começar depois de um
 // gesto do usuário (política de autoplay dos navegadores), por isso fica
 // tudo pendurado em unlock(), chamado no primeiro clique/toque do jogo.
-const MASTER_VOLUME = 0.5;
-const MUSIC_VOLUME  = 0.35; // mais baixa que os efeitos, pra não abafar o resto
+const DEFAULT_SFX_VOLUME   = 0.5;
+const DEFAULT_MUSIC_VOLUME = 0.35; // mais baixa que os efeitos, pra não abafar o resto
+const VOL_KEY = 'ilhaDosDinos:volume';
 
 const SFX_DIR = '/sfx/';
 const SFX_FILES = {
@@ -58,20 +65,45 @@ const RUMBLE_FILTER_FREQ = 120;
 const RUMBLE_GAIN        = 0.12;
 const RUMBLE_RAMP        = 0.4;
 
+function clamp01(v){ return Math.max(0, Math.min(1, v)); }
+
+function loadVolumePrefs(){
+  try {
+    const raw = localStorage.getItem(VOL_KEY);
+    const p = raw ? JSON.parse(raw) : {};
+    return {
+      sfxVolume: typeof p.sfxVolume === 'number' ? clamp01(p.sfxVolume) : DEFAULT_SFX_VOLUME,
+      musicVolume: typeof p.musicVolume === 'number' ? clamp01(p.musicVolume) : DEFAULT_MUSIC_VOLUME,
+      sfxMuted: !!p.sfxMuted,
+      musicMuted: !!p.musicMuted
+    };
+  } catch (e) {
+    return { sfxVolume: DEFAULT_SFX_VOLUME, musicVolume: DEFAULT_MUSIC_VOLUME, sfxMuted: false, musicMuted: false };
+  }
+}
+
 export function createAudioSystem(){
-  let ctx = null, masterGain = null, muted = false, noiseBuffer = null;
+  let ctx = null, sfxGain = null, musicGain = null, noiseBuffer = null;
   let rumbleSrc = null, rumbleGain = null, rumbleOn = false;
   let samples = {}; // key -> AudioBuffer, só as que já carregaram com sucesso
   let musicEl = null, musicStarted = false;
+  const vol = loadVolumePrefs();
+
+  function persistVolume(){
+    try { localStorage.setItem(VOL_KEY, JSON.stringify(vol)); } catch (e) {}
+  }
 
   function ensureContext(){
     if (ctx) return;
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return; // navegador sem Web Audio: fica em silêncio, sem quebrar nada
     ctx = new Ctx();
-    masterGain = ctx.createGain();
-    masterGain.gain.value = muted ? 0 : MASTER_VOLUME;
-    masterGain.connect(ctx.destination);
+    sfxGain = ctx.createGain();
+    sfxGain.gain.value = vol.sfxMuted ? 0 : vol.sfxVolume;
+    sfxGain.connect(ctx.destination);
+    musicGain = ctx.createGain();
+    musicGain.gain.value = vol.musicMuted ? 0 : vol.musicVolume;
+    musicGain.connect(ctx.destination);
   }
 
   function loadSample(key, filename){
@@ -91,9 +123,7 @@ export function createAudioSystem(){
     musicEl = new Audio(MUSIC_FILE);
     musicEl.loop = true;
     const src = ctx.createMediaElementSource(musicEl);
-    const gain = ctx.createGain();
-    gain.gain.value = MUSIC_VOLUME; // mudo geral já é aplicado a jusante, em masterGain
-    src.connect(gain); gain.connect(masterGain);
+    src.connect(musicGain);
     musicEl.play().catch(function(){}); // sem arquivo ainda, ou autoplay bloqueado: sem quebrar nada
   }
 
@@ -109,11 +139,29 @@ export function createAudioSystem(){
     }
   }
 
-  function setMuted(m){
-    muted = m;
-    if (masterGain) masterGain.gain.setTargetAtTime(muted ? 0 : MASTER_VOLUME, ctx.currentTime, 0.05);
+  function getVolumePrefs(){
+    return { sfxVolume: vol.sfxVolume, musicVolume: vol.musicVolume, sfxMuted: vol.sfxMuted, musicMuted: vol.musicMuted };
   }
-  function isMuted(){ return muted; }
+  function setSfxVolume(v){
+    vol.sfxVolume = clamp01(v);
+    persistVolume();
+    if (sfxGain && !vol.sfxMuted) sfxGain.gain.setTargetAtTime(vol.sfxVolume, ctx.currentTime, 0.05);
+  }
+  function setMusicVolume(v){
+    vol.musicVolume = clamp01(v);
+    persistVolume();
+    if (musicGain && !vol.musicMuted) musicGain.gain.setTargetAtTime(vol.musicVolume, ctx.currentTime, 0.05);
+  }
+  function setSfxMuted(m){
+    vol.sfxMuted = !!m;
+    persistVolume();
+    if (sfxGain) sfxGain.gain.setTargetAtTime(vol.sfxMuted ? 0 : vol.sfxVolume, ctx.currentTime, 0.05);
+  }
+  function setMusicMuted(m){
+    vol.musicMuted = !!m;
+    persistVolume();
+    if (musicGain) musicGain.gain.setTargetAtTime(vol.musicMuted ? 0 : vol.musicVolume, ctx.currentTime, 0.05);
+  }
 
   function getNoiseBuffer(){
     if (noiseBuffer) return noiseBuffer;
@@ -124,20 +172,20 @@ export function createAudioSystem(){
     return noiseBuffer;
   }
 
-  // toca um arquivo já carregado (se existir) direto no barramento principal
-  // — mesma sujeição ao volume/mudo geral que os sons sintetizados.
+  // toca um arquivo já carregado (se existir) no barramento de efeitos —
+  // mesmo volume/mudo dos sons sintetizados, nunca o da música.
   function playSample(key){
     const buf = samples[key];
-    if (!buf || !ctx || muted) return false;
+    if (!buf || !ctx || vol.sfxMuted) return false;
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    src.connect(masterGain);
+    src.connect(sfxGain);
     src.start();
     return true;
   }
 
   function blip(o, delay){
-    if (!ctx || muted) return;
+    if (!ctx || vol.sfxMuted) return;
     const t0 = ctx.currentTime + (delay || 0);
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
@@ -147,12 +195,12 @@ export function createAudioSystem(){
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(o.gain, t0 + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + o.duration);
-    osc.connect(g); g.connect(masterGain);
+    osc.connect(g); g.connect(sfxGain);
     osc.start(t0); osc.stop(t0 + o.duration + 0.02);
   }
 
   function noiseBurst(o){
-    if (!ctx || muted) return;
+    if (!ctx || vol.sfxMuted) return;
     const t0 = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = getNoiseBuffer();
@@ -162,7 +210,7 @@ export function createAudioSystem(){
     const g = ctx.createGain();
     g.gain.setValueAtTime(o.gain, t0);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + o.duration);
-    src.connect(filter); filter.connect(g); g.connect(masterGain);
+    src.connect(filter); filter.connect(g); g.connect(sfxGain);
     src.start(t0); src.stop(t0 + o.duration + 0.02);
   }
 
@@ -202,7 +250,7 @@ export function createAudioSystem(){
     filter.frequency.value = RUMBLE_FILTER_FREQ;
     rumbleGain = ctx.createGain();
     rumbleGain.gain.value = 0;
-    rumbleSrc.connect(filter); filter.connect(rumbleGain); rumbleGain.connect(masterGain);
+    rumbleSrc.connect(filter); filter.connect(rumbleGain); rumbleGain.connect(sfxGain);
     rumbleSrc.start();
   }
   function setVolcanoRumble(active){
@@ -213,9 +261,10 @@ export function createAudioSystem(){
   }
 
   return {
-    unlock, setMuted, isMuted,
+    unlock,
     playClick, playRaise, playDig, playFossilFound, playFossilComplete,
     playVolcanoBoom, playPterossauro, playSplash, playCelebrate,
-    setVolcanoRumble
+    setVolcanoRumble,
+    getVolumePrefs, setSfxVolume, setMusicVolume, setSfxMuted, setMusicMuted
   };
 }

@@ -193,3 +193,36 @@ button.act[aria-pressed="false"]{ opacity:.45; }
 /* dia/noite tem duas cores próprias — sol de dia, lua à noite — em vez do
    esmaecimento genérico, pra ficar claro qual dos dois está ativo */
 #btn-night[aria-pressed="true"]{ background:#33416e; color:#fff; border-color:#232f52; }
+
+/* volume — mesmo padrão do menu de mapa (botão que abre um painel), só que
+   do lado direito da tela, logo abaixo do dia/noite, e o painel abre pra
+   dentro (a partir da borda direita) pra não estourar a tela */
+#volumeMenu{ position:fixed; top:108px; right:12px; z-index:10; user-select:none; }
+#btn-volume{ width:40px; height:40px; display:flex; align-items:center; justify-content:center;
+  font-size:18px; cursor:pointer;
+  background:var(--paper); color:var(--ink); border:2px solid var(--edge); border-radius:10px;
+  box-shadow:0 5px 16px rgba(50,60,58,.16);
+  transition:transform .08s, background .12s, border-color .12s; }
+#btn-volume:active{ transform:translateY(1px); }
+#btn-volume:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; }
+#btn-volume[aria-expanded="true"]{ background:#5f9e86; color:#fff; border-color:#4a8570; }
+
+#volume-panel{ display:none; position:absolute; top:48px; right:0; width:230px;
+  flex-direction:column; gap:10px; background:var(--paper);
+  border:2px solid var(--edge); border-radius:12px; padding:10px 12px;
+  box-shadow:0 5px 16px rgba(50,60,58,.16); }
+#volumeMenu.open #volume-panel{ display:flex; }
+
+.vol-row{ display:flex; align-items:center; gap:8px; }
+.vol-label{ flex:0 0 auto; width:48px; font-size:11.5px; font-weight:bold; }
+.vol-row input[type="range"]{ flex:1; accent-color:var(--accent); cursor:pointer; }
+/* botãozinho de mudo por trilha — vermelho quando ativo, ao contrário do
+   verde de "ligado" usado no resto do HUD, porque aqui apertado significa
+   "sem som", não "recurso ativado" */
+.vol-mute{ flex:0 0 auto; width:30px; height:30px; padding:0; display:flex;
+  align-items:center; justify-content:center; font-size:15px; cursor:pointer;
+  background:#fff; color:var(--ink); border:2px solid var(--edge); border-radius:8px;
+  transition:transform .08s, background .12s, border-color .12s; }
+.vol-mute:active{ transform:translateY(1px); }
+.vol-mute:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; }
+.vol-mute[aria-pressed="true"]{ background:#c85a5a; color:#fff; border-color:#a34747; }
