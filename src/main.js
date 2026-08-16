@@ -154,7 +154,7 @@ const hud = createHud({
   onSfxMuted: function(m){ audio.unlock(); audio.setSfxMuted(m); },
   onToggleDig: function(on){ audio.unlock(); audio.playClick(); digMode = on; },
   onToggleFullscreen: function(){ audio.unlock(); audio.playClick(); },
-  onToggleNight: function(on){ audio.unlock(); audio.playClick(); isNight = on; applyDayNight(); },
+  onToggleNight: function(on){ audio.unlock(); audio.playClick(); isNight = on; applyDayNight(); audio.setNightMusic(on); },
   shadowsOn: !pcJurassico,
   jurassic: pcJurassico,
   onToggleJurassic: function(on){

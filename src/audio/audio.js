@@ -14,8 +14,9 @@
 // precisar reajustar toda vez que recarregar a página.
 //
 // Nomes esperados em public/sfx/ (efeitos curtos, decodificados por inteiro
-// na memória pra tocar sem atraso e poder sobrepor instâncias):
-//   click.mp3            clique de botão/menu genérico
+// na memória pra tocar sem atraso e poder sobrepor instâncias). O clique de
+// botão/menu genérico fica de fora de propósito — é só um blip sintético
+// simples, não precisa de arquivo:
 //   raise.mp3             levantar terra
 //   dig.mp3                cavar/afundar terra
 //   fossil-found.mp3      achou os primeiros ossos (1ª cavada no sítio)
@@ -25,8 +26,11 @@
 //   pterossauro.mp3       pterossauro aparece (montanha alta o suficiente)
 //   splash.mp3             uma célula afundou até virar mar
 //   celebrate.mp3         todas as metas batidas (toca junto dos fogos)
-// E em public/music/:
-//   theme.mp3              música de fundo, em loop, o jogo inteiro
+// E em public/music/: duas faixas em loop, trocadas ao ligar/desligar
+// dia/noite (ver setNightMusic) — ambas ficam prontas desde o início, só
+// uma toca por vez, pra trocar na hora sem esperar carregar de novo.
+//   theme.mp3              música de fundo, modo dia
+//   theme_night.mp3        música de fundo, modo noite
 //
 // O contexto (e o carregamento de tudo isso) só pode começar depois de um
 // gesto do usuário (política de autoplay dos navegadores), por isso fica
@@ -37,7 +41,6 @@ const VOL_KEY = 'ilhaDosDinos:volume';
 
 const SFX_DIR = '/sfx/';
 const SFX_FILES = {
-  click: 'click.mp3',
   raise: 'raise.mp3',
   dig: 'dig.mp3',
   fossilFound: 'fossil-found.mp3',
@@ -48,7 +51,8 @@ const SFX_FILES = {
   splash: 'splash.mp3',
   celebrate: 'celebrate.mp3'
 };
-const MUSIC_FILE = '/music/theme.mp3';
+const MUSIC_DAY_FILE   = '/music/theme.mp3';
+const MUSIC_NIGHT_FILE = '/music/theme_night.mp3';
 
 const CLICK  = { freq:520, freqEnd:640, duration:0.08, type:'sine', gain:0.22 };
 const RAISE  = { freq:260, freqEnd:460, duration:0.12, type:'triangle', gain:0.28 };
@@ -86,7 +90,7 @@ export function createAudioSystem(){
   let ctx = null, sfxGain = null, musicGain = null, noiseBuffer = null;
   let rumbleSrc = null, rumbleGain = null, rumbleOn = false;
   let samples = {}; // key -> AudioBuffer, só as que já carregaram com sucesso
-  let musicEl = null, musicStarted = false;
+  let musicDayEl = null, musicNightEl = null, musicStarted = false, nightMode = false;
   const vol = loadVolumePrefs();
 
   function persistVolume(){
@@ -117,14 +121,30 @@ export function createAudioSystem(){
     Object.keys(SFX_FILES).forEach(function(key){ loadSample(key, SFX_FILES[key]); });
   }
 
+  // dois elementos (não um só trocando de src) porque createMediaElementSource
+  // só pode ser chamado uma vez por <audio> — trocar o src do mesmo elemento
+  // exigiria recriar o nó de áudio toda vez que o dia virasse noite. Assim os
+  // dois já ficam prontos, conectados no mesmo musicGain, e só um toca (o
+  // outro fica pausado) — a troca é instantânea, sem recarregar nada.
+  function makeMusicTrack(url){
+    const el = new Audio(url);
+    el.loop = true;
+    const src = ctx.createMediaElementSource(el);
+    src.connect(musicGain);
+    return el;
+  }
   function startMusic(){
     if (musicStarted) return;
     musicStarted = true;
-    musicEl = new Audio(MUSIC_FILE);
-    musicEl.loop = true;
-    const src = ctx.createMediaElementSource(musicEl);
-    src.connect(musicGain);
-    musicEl.play().catch(function(){}); // sem arquivo ainda, ou autoplay bloqueado: sem quebrar nada
+    musicDayEl = makeMusicTrack(MUSIC_DAY_FILE);
+    musicNightEl = makeMusicTrack(MUSIC_NIGHT_FILE);
+    (nightMode ? musicNightEl : musicDayEl).play().catch(function(){}); // sem arquivo ainda, ou autoplay bloqueado: sem quebrar nada
+  }
+  function setNightMusic(active){
+    nightMode = active;
+    if (!musicStarted) return; // ainda sem contexto — startMusic() já nasce olhando pro nightMode atual
+    (nightMode ? musicDayEl : musicNightEl).pause();
+    (nightMode ? musicNightEl : musicDayEl).play().catch(function(){});
   }
 
   function unlock(){
@@ -264,7 +284,7 @@ export function createAudioSystem(){
     unlock,
     playClick, playRaise, playDig, playFossilFound, playFossilComplete,
     playVolcanoBoom, playPterossauro, playSplash, playCelebrate,
-    setVolcanoRumble,
+    setVolcanoRumble, setNightMusic,
     getVolumePrefs, setSfxVolume, setMusicVolume, setSfxMuted, setMusicMuted
   };
 }
